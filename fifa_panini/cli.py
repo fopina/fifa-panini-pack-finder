@@ -165,6 +165,7 @@ class TryCode(ConfigFileMixin, CLI.Command):
         }
         state_file = self.state_path
         try:
+            state_file.parent.mkdir(parents=True, exist_ok=True)
             with state_file.open('w') as file:
                 json.dump(state, file, indent=2)
                 file.write('\n')
@@ -208,4 +209,8 @@ class TryCode(ConfigFileMixin, CLI.Command):
 
     @property
     def state_path(self):
-        return Path(self.state_file)
+        state_file = Path(self.state_file)
+        if state_file.is_absolute() or not getattr(self, 'config', None):
+            return state_file
+
+        return Path(self.config).parent / state_file

@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from fifa_panini.cli import CLI, TryCode
+from fifa_panini.cli import CLI, DEFAULT_STATE_FILE, TryCode
 
 
 def test_try_code_formats_four_digit_suffixes():
@@ -83,6 +83,26 @@ def test_try_code_loads_settings_from_config(tmp_path):
 
     assert result.exit_code == 0
     assert result.output == 'DRY RUN POST https://example.test/redeem code=ABC-0000\n'
+
+
+def test_default_state_file_sits_next_to_config_file(tmp_path, monkeypatch):
+    config = tmp_path / 'settings' / 'config.toml'
+    config.parent.mkdir()
+    config.write_text('code_base = "ABC-"\ncookie = "session=value"\n')
+
+    attempts = []
+
+    def fake_send_code(self, code):
+        attempts.append(code)
+        return '{"ok":true}'
+
+    monkeypatch.setattr(TryCode, 'send_code', fake_send_code)
+
+    result = CliRunner().invoke(CLI.click, ['try-code', '--config', str(config)])
+
+    assert result.exit_code == 0
+    assert attempts == ['ABC-0000']
+    assert (config.parent / DEFAULT_STATE_FILE).exists()
 
 
 def test_config_command_masks_cookie(tmp_path):
