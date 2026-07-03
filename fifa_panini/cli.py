@@ -1,9 +1,20 @@
-from urllib.parse import quote
+import json
+import time
+from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import classyclick
 import click
+from classyclick.helpers.config import ConfigBaseCommand, ConfigFileMixin
+from classyclick.utils import _is_click_unset
 
 from . import __version__
+
+DEFAULT_ENDPOINT = 'https://paninicollection.fifa.com/api/unlock_pack.json'
+DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
+CONFIG_EXAMPLE_PATH = Path(__file__).with_name('config.example.toml')
+INVALID_CODE_MARKER = '"code.invalid"'
 
 
 class CLI(classyclick.Group):
@@ -15,28 +26,186 @@ class CLI(classyclick.Group):
     )
 
 
-class TryCode(CLI.Command):
-    """Prepare a promo-code attempt against an endpoint."""
+class Config(ConfigFileMixin, ConfigBaseCommand, CLI.Command):
+    """Show or edit the current CLI configuration."""
 
-    code: str = classyclick.Argument(metavar='CODE')
-    endpoint: str = classyclick.Option('-e', required=True, help='Endpoint URL to test against.')
-    code_parameter: str = classyclick.Option(
-        '--code-param',
-        default='code',
-        show_default=True,
-        help='Query parameter name used for the promo code.',
-    )
-    dry_run: bool = classyclick.Option(default=True, help='Print the request that would be attempted.')
+    CONFIG_DEFAULT_NAME = 'fifa-panini'
+    CONFIG_EXAMPLE_PATH = CONFIG_EXAMPLE_PATH
+    MASKED_FIELDS = (*ConfigBaseCommand.MASKED_FIELDS, 'cookie')
+
+    env: str = classyclick.Option(help='Environment to use for the command.')
 
     def __call__(self):
-        url = self.url
+        self.load_persistent_config()
+        super().__call__()
+
+    def load_persistent_config(self):
+        if _is_click_unset(self.config):
+            self.config = None
+        if _is_click_unset(self.env):
+            self.env = None
+        if self.ctx is None:
+            self.ctx = click.Context(type(self).click)
+        self.load_config()
+
+
+class TryCode(ConfigFileMixin, CLI.Command):
+    """Try FIFA Panini promo codes by iterating the final four digits."""
+
+    CONFIG_DEFAULT_NAME = 'fifa-panini'
+    CONFIG_EXAMPLE_PATH = CONFIG_EXAMPLE_PATH
+
+    env: str = classyclick.Option(help='Environment to use for the command.')
+    code_base: str = classyclick.Option(
+        help='Promo code base to prepend before iterating the final four digits.',
+    )
+    cookie: str = classyclick.Option(
+        '-c',
+        '--cookie',
+        help='Complete Cookie header value copied from the browser request.',
+    )
+    endpoint: str = classyclick.Option(
+        default=DEFAULT_ENDPOINT,
+        show_default=True,
+        help='Endpoint URL to test against.',
+    )
+    state_file: Path = classyclick.Option(
+        '-s',
+        default=Path(DEFAULT_STATE_FILE),
+        show_default=True,
+        help='Path used to save resume state.',
+    )
+    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    request_timeout: float = classyclick.Option(
+        '--timeout',
+        default=30.0,
+        show_default=True,
+        help='HTTP request timeout in seconds.',
+    )
+
+    def __call__(self):
+        self.load_persistent_config()
+        self.validate_settings()
+
         if self.dry_run:
-            click.echo(f'DRY RUN {url}')
+            code = self.next_code()
+            click.echo(f'DRY RUN POST {self.endpoint} code={code}')
             return
 
-        raise click.ClickException('Real endpoint attempts are not implemented yet.')
+        for code in self.iter_codes():
+            self.save_state(code, self.suffix_from_code(code))
+            click.echo(f'Trying {code}')
+            response = self.send_code(code)
+
+            if INVALID_CODE_MARKER not in response:
+                click.echo(f'Stopping at {code}: response did not contain {INVALID_CODE_MARKER}')
+                return
+
+            self.save_state(code, self.suffix_from_code(code) + 1)
+            time.sleep(1)
+
+        raise click.ClickException('All 10000 suffixes were tried without a non-invalid response.')
+
+    def load_persistent_config(self):
+        if _is_click_unset(self.config):
+            self.config = None
+        if _is_click_unset(self.env):
+            self.env = None
+        if self.ctx is None:
+            self.ctx = click.Context(type(self).click)
+        self.load_config()
+
+    def validate_settings(self):
+        missing = [name for name in ('code_base', 'cookie') if not getattr(self, name)]
+        if missing:
+            raise click.ClickException(
+                f'Missing required setting(s): {", ".join(missing)}. '
+                f'Pass them as options or save them in {self.config}.'
+            )
+
+    def iter_codes(self):
+        start = self.start_suffix()
+        for suffix in range(start, 10000):
+            yield self.format_code(suffix)
+
+    def next_code(self):
+        start = self.start_suffix()
+        if start >= 10000:
+            raise click.ClickException('All 10000 suffixes have already been tried for this code base.')
+
+        return self.format_code(start)
+
+    def start_suffix(self):
+        state = self.load_state()
+        if state is None:
+            return 0
+
+        if state.get('code_base') != self.code_base:
+            return 0
+
+        next_suffix = int(state.get('next_suffix', 0))
+        return min(next_suffix, 10000)
+
+    def load_state(self):
+        state_file = self.state_path
+        if not state_file.exists():
+            return None
+
+        try:
+            with state_file.open() as state:
+                return json.load(state)
+        except (OSError, json.JSONDecodeError) as error:
+            raise click.ClickException(f'Could not read state file {state_file}: {error}') from error
+
+    def save_state(self, code, next_suffix):
+        state = {
+            'code_base': self.code_base,
+            'current_code': code,
+            'next_suffix': next_suffix,
+        }
+        state_file = self.state_path
+        try:
+            with state_file.open('w') as file:
+                json.dump(state, file, indent=2)
+                file.write('\n')
+        except OSError as error:
+            raise click.ClickException(f'Could not write state file {state_file}: {error}') from error
+
+    def suffix_from_code(self, code):
+        return int(code[-4:])
+
+    def format_code(self, suffix):
+        return f'{self.code_base}{suffix:04d}'
+
+    def send_code(self, code):
+        payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
+        request = Request(
+            self.endpoint,
+            data=payload,
+            headers={
+                'Cookie': self.cookie,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0',
+                'Accept': '*/*',
+                'Accept-Language': 'en-GB,en;q=0.9',
+                'Referer': 'https://paninicollection.fifa.com/game/flash',
+                'X-User-Agent': 'Unity/1.3.0 (MacOS 10.15) Unity/6000.0.65f1 webgl_hires',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://paninicollection.fifa.com',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Gpc': '1',
+                'Priority': 'u=4',
+            },
+            method='POST',
+        )
+
+        try:
+            with urlopen(request, timeout=self.request_timeout) as response:
+                return response.read().decode('utf-8', errors='replace')
+        except OSError as error:
+            raise click.ClickException(f'Request failed for {code}: {error}') from error
 
     @property
-    def url(self):
-        separator = '&' if '?' in self.endpoint else '?'
-        return f'{self.endpoint}{separator}{quote(self.code_parameter)}={quote(self.code)}'
+    def state_path(self):
+        return Path(self.state_file)

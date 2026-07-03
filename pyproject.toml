@@ -31,6 +31,9 @@ fifa-panini = "fifa_panini.__main__:main"
 [tool.setuptools.packages.find]
 include = ["fifa_panini*"]
 
+[tool.setuptools.package-data]
+fifa_panini = ["config.example.toml"]
+
 [tool.setuptools.dynamic]
 version = {attr = "fifa_panini.__version__"}
 
