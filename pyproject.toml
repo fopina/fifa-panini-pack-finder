@@ -3,15 +3,15 @@ requires = ["setuptools>=69.5.0,<80.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# TODO: update with package name in pypi
-name = "fp-github-template-example"
+name = "fifa-panini"
 authors = [{name="Filipe Pina", email="shelf-corncob-said@duck.com" }]
 dynamic = ["version"]
-# TODO: one-line description of the package
-description = "package example"
+description = "CLI for trying FIFA Panini promo codes against an endpoint"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "classyclick>=1.0.3",
+]
 
 [dependency-groups]
 dev = [
@@ -23,20 +23,19 @@ dev = [
 ]
 
 [project.urls]
-# TODO: update this
-Homepage = "https://github.com/fopina/python-package-template"
+Homepage = "https://github.com/fopina/fifa-panini-pack-finder"
 
 [project.scripts]
-# TODO: remove this if package is not a CLI or update it if it is
-example-cli = "example.__main__:main"
+fifa-panini = "fifa_panini.__main__:main"
 
 [tool.setuptools.packages.find]
-# TODO: replace example with your package name
-include = ["example*"]
+include = ["fifa_panini*"]
+
+[tool.setuptools.package-data]
+fifa_panini = ["config.example.toml"]
 
 [tool.setuptools.dynamic]
-# TODO: replace example with your package name
-version = {attr = "example.__version__"}
+version = {attr = "fifa_panini.__version__"}
 
 [tool.ruff]
 line-length = 120
@@ -71,8 +70,7 @@ testpaths = [
 ]
 
 [tool.coverage.run]
-# TODO: replace
-source = ["example"]
+source = ["fifa_panini"]
 
 [tool.coverage.report]
 show_missing = true
