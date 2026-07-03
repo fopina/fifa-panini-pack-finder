@@ -1,5 +1,7 @@
 import json
+import re
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,6 +17,15 @@ DEFAULT_ENDPOINT = 'https://paninicollection.fifa.com/api/unlock_pack.json'
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 CONFIG_EXAMPLE_PATH = Path(__file__).with_name('config.example.toml')
 INVALID_CODE_MARKER = '"code.invalid"'
+CODE_BASE_PATTERN = re.compile(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$')
+SUFFIX_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+TOTAL_SUFFIXES = len(SUFFIX_ALPHABET) ** 4
+
+
+@dataclass(frozen=True)
+class CodeResponse:
+    text: str
+    headers: dict[str, str]
 
 
 class CLI(classyclick.Group):
@@ -50,14 +61,14 @@ class Config(ConfigFileMixin, ConfigBaseCommand, CLI.Command):
 
 
 class TryCode(ConfigFileMixin, CLI.Command):
-    """Try FIFA Panini promo codes by iterating the final four digits."""
+    """Try FIFA Panini promo codes by iterating the final block."""
 
     CONFIG_DEFAULT_NAME = 'fifa-panini'
     CONFIG_EXAMPLE_PATH = CONFIG_EXAMPLE_PATH
 
     env: str = classyclick.Option(help='Environment to use for the command.')
     code_base: str = classyclick.Option(
-        help='Promo code base to prepend before iterating the final four digits.',
+        help='Promo code base in XXXX-XXXX-XXXX format; the final block is iterated.',
     )
     cookie: str = classyclick.Option(
         '-c',
@@ -97,14 +108,15 @@ class TryCode(ConfigFileMixin, CLI.Command):
             click.echo(f'Trying {code}')
             response = self.send_code(code)
 
-            if INVALID_CODE_MARKER not in response:
+            if INVALID_CODE_MARKER not in response.text:
                 click.echo(f'Stopping at {code}: response did not contain {INVALID_CODE_MARKER}')
+                self.print_response(response)
                 return
 
             self.save_state(code, self.suffix_from_code(code) + 1)
             time.sleep(1)
 
-        raise click.ClickException('All 10000 suffixes were tried without a non-invalid response.')
+        raise click.ClickException(f'All {TOTAL_SUFFIXES} suffixes were tried without a non-invalid response.')
 
     def load_persistent_config(self):
         if _is_click_unset(self.config):
@@ -122,16 +134,20 @@ class TryCode(ConfigFileMixin, CLI.Command):
                 f'Missing required setting(s): {", ".join(missing)}. '
                 f'Pass them as options or save them in {self.config}.'
             )
+        if not CODE_BASE_PATTERN.fullmatch(self.code_base):
+            raise click.ClickException(
+                '--code-base must be in XXXX-XXXX-XXXX format using only uppercase A-Z and 0-9 characters.'
+            )
 
     def iter_codes(self):
         start = self.start_suffix()
-        for suffix in range(start, 10000):
+        for suffix in range(start, TOTAL_SUFFIXES):
             yield self.format_code(suffix)
 
     def next_code(self):
         start = self.start_suffix()
-        if start >= 10000:
-            raise click.ClickException('All 10000 suffixes have already been tried for this code base.')
+        if start >= TOTAL_SUFFIXES:
+            raise click.ClickException(f'All {TOTAL_SUFFIXES} suffixes have already been tried for this code base.')
 
         return self.format_code(start)
 
@@ -144,7 +160,7 @@ class TryCode(ConfigFileMixin, CLI.Command):
             return 0
 
         next_suffix = int(state.get('next_suffix', 0))
-        return min(next_suffix, 10000)
+        return min(next_suffix, TOTAL_SUFFIXES)
 
     def load_state(self):
         state_file = self.state_path
@@ -173,10 +189,24 @@ class TryCode(ConfigFileMixin, CLI.Command):
             raise click.ClickException(f'Could not write state file {state_file}: {error}') from error
 
     def suffix_from_code(self, code):
-        return int(code[-4:])
+        suffix = 0
+        for character in code[-4:]:
+            suffix = suffix * len(SUFFIX_ALPHABET) + SUFFIX_ALPHABET.index(character)
+        return suffix
 
     def format_code(self, suffix):
-        return f'{self.code_base}{suffix:04d}'
+        characters = []
+        for _ in range(4):
+            suffix, index = divmod(suffix, len(SUFFIX_ALPHABET))
+            characters.append(SUFFIX_ALPHABET[index])
+        return f'{self.code_base[:-4]}{"".join(reversed(characters))}'
+
+    def print_response(self, response):
+        click.echo('Response headers:')
+        for name, value in response.headers.items():
+            click.echo(f'{name}: {value}')
+        click.echo('Response text:')
+        click.echo(response.text, nl=not response.text.endswith('\n'))
 
     def send_code(self, code):
         payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
@@ -203,7 +233,10 @@ class TryCode(ConfigFileMixin, CLI.Command):
 
         try:
             with urlopen(request, timeout=self.request_timeout) as response:
-                return response.read().decode('utf-8', errors='replace')
+                return CodeResponse(
+                    text=response.read().decode('utf-8', errors='replace'),
+                    headers=dict(response.headers.items()),
+                )
         except OSError as error:
             raise click.ClickException(f'Request failed for {code}: {error}') from error
 

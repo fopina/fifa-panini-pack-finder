@@ -1,5 +1,5 @@
 code_base = ""
-cookie = ""
+cookie = "_panstwc_session=....; _abck=...."
 # endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
 # state_file = ".fifa-panini-try-code-state.json"
 # request_timeout = 30.0
