@@ -10,11 +10,13 @@ import classyclick
 import click
 from classyclick.helpers.config import ConfigBaseCommand, ConfigFileMixin
 from classyclick.utils import _is_click_unset
+from tqdm import tqdm
 
 from . import __version__
 
 DEFAULT_ENDPOINT = 'https://paninicollection.fifa.com/api/unlock_pack.json'
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
+DEFAULT_REQUEST_DELAY = 1.0
 CONFIG_EXAMPLE_PATH = Path(__file__).with_name('config.example.toml')
 INVALID_CODE_MARKER = '"code.invalid"'
 CODE_BASE_PATTERN = re.compile(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$')
@@ -93,6 +95,12 @@ class TryCode(ConfigFileMixin, CLI.Command):
         show_default=True,
         help='HTTP request timeout in seconds.',
     )
+    request_delay: float = classyclick.Option(
+        '--request-delay',
+        default=DEFAULT_REQUEST_DELAY,
+        show_default=True,
+        help='Delay between requests in seconds.',
+    )
 
     def __call__(self):
         self.load_persistent_config()
@@ -100,21 +108,25 @@ class TryCode(ConfigFileMixin, CLI.Command):
 
         if self.dry_run:
             code = self.next_code()
-            click.echo(f'DRY RUN POST {self.endpoint} code={code}')
+            tqdm.write(f'DRY RUN POST {self.endpoint} code={code}')
             return
 
-        for code in self.iter_codes():
-            self.save_state(code, self.suffix_from_code(code))
-            click.echo(f'Trying {code}')
-            response = self.send_code(code)
+        start = self.start_suffix()
+        with tqdm(total=TOTAL_SUFFIXES, initial=start, unit='code') as progress:
+            for code in self.iter_codes(start):
+                progress.set_description(f'Testing {code}')
+                self.save_state(code, self.suffix_from_code(code))
+                response = self.send_code(code)
 
-            if INVALID_CODE_MARKER not in response.text:
-                click.echo(f'Stopping at {code}: response did not contain {INVALID_CODE_MARKER}')
-                self.print_response(response)
-                return
+                if INVALID_CODE_MARKER not in response.text:
+                    tqdm.write(f'Stopping at {code}: response did not contain {INVALID_CODE_MARKER}')
+                    self.print_response(response)
+                    return
 
-            self.save_state(code, self.suffix_from_code(code) + 1)
-            time.sleep(1)
+                self.save_state(code, self.suffix_from_code(code) + 1)
+                progress.update()
+                if self.request_delay:
+                    time.sleep(self.request_delay)
 
         raise click.ClickException(f'All {TOTAL_SUFFIXES} suffixes were tried without a non-invalid response.')
 
@@ -138,9 +150,12 @@ class TryCode(ConfigFileMixin, CLI.Command):
             raise click.ClickException(
                 '--code-base must be in XXXX-XXXX-XXXX format using only uppercase A-Z and 0-9 characters.'
             )
+        if self.request_delay < 0:
+            raise click.ClickException('--request-delay must be greater than or equal to 0.')
 
-    def iter_codes(self):
-        start = self.start_suffix()
+    def iter_codes(self, start=None):
+        if start is None:
+            start = self.start_suffix()
         for suffix in range(start, TOTAL_SUFFIXES):
             yield self.format_code(suffix)
 
@@ -202,11 +217,11 @@ class TryCode(ConfigFileMixin, CLI.Command):
         return f'{self.code_base[:-4]}{"".join(reversed(characters))}'
 
     def print_response(self, response):
-        click.echo('Response headers:')
+        tqdm.write('Response headers:')
         for name, value in response.headers.items():
-            click.echo(f'{name}: {value}')
-        click.echo('Response text:')
-        click.echo(response.text, nl=not response.text.endswith('\n'))
+            tqdm.write(f'{name}: {value}')
+        tqdm.write('Response text:')
+        tqdm.write(response.text, end='' if response.text.endswith('\n') else '\n')
 
     def send_code(self, code):
         payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
