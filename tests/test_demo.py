@@ -138,6 +138,83 @@ def test_try_code_stops_when_response_is_not_invalid(tmp_path, monkeypatch):
     assert attempts == ['ABCD-EFGH-AAAA', 'ABCD-EFGH-AAAB']
 
 
+def test_try_code_uses_configured_request_delay(tmp_path, monkeypatch):
+    attempts = []
+    sleeps = []
+    command = TryCode(
+        code_base='ABCD-EFGH-IJKL',
+        cookie='session=value',
+        dry_run=False,
+        request_delay=0.25,
+        state_file=tmp_path / 'state.json',
+        config=tmp_path / 'config.toml',
+    )
+    command.config.write_text('')
+
+    def fake_send_code(code):
+        attempts.append(code)
+        if len(attempts) == 1:
+            return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
+        return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+
+    monkeypatch.setattr(command, 'send_code', fake_send_code)
+    monkeypatch.setattr('fifa_panini.cli.time.sleep', sleeps.append)
+
+    command()
+
+    assert sleeps == [0.25]
+
+
+def test_try_code_skips_request_delay_when_zero(tmp_path, monkeypatch):
+    attempts = []
+    sleeps = []
+    command = TryCode(
+        code_base='ABCD-EFGH-IJKL',
+        cookie='session=value',
+        dry_run=False,
+        request_delay=0,
+        state_file=tmp_path / 'state.json',
+        config=tmp_path / 'config.toml',
+    )
+    command.config.write_text('')
+
+    def fake_send_code(code):
+        attempts.append(code)
+        if len(attempts) == 1:
+            return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
+        return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+
+    monkeypatch.setattr(command, 'send_code', fake_send_code)
+    monkeypatch.setattr('fifa_panini.cli.time.sleep', sleeps.append)
+
+    command()
+
+    assert sleeps == []
+
+
+def test_try_code_rejects_negative_request_delay(tmp_path):
+    config = tmp_path / 'config.toml'
+    config.write_text('')
+
+    result = CliRunner().invoke(
+        CLI.click,
+        [
+            'try-code',
+            '--config',
+            str(config),
+            '--dry-run',
+            '--cookie',
+            'session=value',
+            '--code-base',
+            'ABCD-EFGH-IJKL',
+            '--request-delay=-1',
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert '--request-delay must be greater than or equal to 0' in result.output
+
+
 def test_try_code_loads_settings_from_config(tmp_path):
     config = tmp_path / 'config.toml'
     config.write_text(
@@ -147,6 +224,7 @@ def test_try_code_loads_settings_from_config(tmp_path):
                 'cookie = "session=value"',
                 'endpoint = "https://example.test/redeem"',
                 f'state_file = "{tmp_path / "state.json"}"',
+                'request_delay = 0',
             ]
         )
     )
