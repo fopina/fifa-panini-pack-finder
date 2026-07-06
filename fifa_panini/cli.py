@@ -19,6 +19,7 @@ DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 DEFAULT_REQUEST_DELAY = 1.0
 CONFIG_EXAMPLE_PATH = Path(__file__).with_name('config.example.toml')
 INVALID_CODE_MARKER = '"code.invalid"'
+CODE_ALREADY_USED_MARKER = '"code.already_used"'
 CODE_BASE_PATTERN = re.compile(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$')
 SUFFIX_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 TOTAL_SUFFIXES = len(SUFFIX_ALPHABET) ** 4
@@ -111,6 +112,7 @@ class TryCode(ConfigFileMixin, CLI.Command):
             tqdm.write(f'DRY RUN POST {self.endpoint} code={code}')
             return
 
+        self.check_code_base()
         start = self.start_suffix()
         with tqdm(total=TOTAL_SUFFIXES, initial=start, unit='code') as progress:
             for code in self.iter_codes(start):
@@ -152,6 +154,15 @@ class TryCode(ConfigFileMixin, CLI.Command):
             )
         if self.request_delay < 0:
             raise click.ClickException('--request-delay must be greater than or equal to 0.')
+
+    def check_code_base(self):
+        response = self.send_code(self.code_base)
+        if CODE_ALREADY_USED_MARKER not in response.text:
+            print(response.text)
+            raise click.ClickException(
+                f'Code base check failed for {self.code_base}: expected response to contain '
+                f'{CODE_ALREADY_USED_MARKER}.'
+            )
 
     def iter_codes(self, start=None):
         if start is None:
