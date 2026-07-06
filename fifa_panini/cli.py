@@ -160,8 +160,7 @@ class TryCode(ConfigFileMixin, CLI.Command):
         if CODE_ALREADY_USED_MARKER not in response.text:
             print(response.text)
             raise click.ClickException(
-                f'Code base check failed for {self.code_base}: expected response to contain '
-                f'{CODE_ALREADY_USED_MARKER}.'
+                f'Code base check failed for {self.code_base}: expected response to contain {CODE_ALREADY_USED_MARKER}.'
             )
 
     def iter_codes(self, start=None):
