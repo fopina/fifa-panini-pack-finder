@@ -1,3 +1,5 @@
+import click
+import pytest
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI, DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse, TryCode
@@ -103,7 +105,10 @@ def test_try_code_progress_resumes_from_saved_suffix(tmp_path, monkeypatch):
     monkeypatch.setattr(
         command,
         'send_code',
-        lambda _code: CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'}),
+        lambda code: CodeResponse(
+            text='{"error":"code.already.used"}' if code == command.code_base else '{"ok":true}',
+            headers={'Content-Type': 'application/json'},
+        ),
     )
 
     command()
@@ -126,7 +131,9 @@ def test_try_code_stops_when_response_is_not_invalid(tmp_path, monkeypatch):
 
     def fake_send_code(code):
         attempts.append(code)
-        if len(attempts) == 1:
+        if code == command.code_base:
+            return CodeResponse(text='{"error":"code.already.used"}', headers={'Content-Type': 'application/json'})
+        if len(attempts) == 2:
             return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
         return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json', 'X-Pack': 'found'})
 
@@ -135,7 +142,32 @@ def test_try_code_stops_when_response_is_not_invalid(tmp_path, monkeypatch):
 
     command()
 
-    assert attempts == ['ABCD-EFGH-AAAA', 'ABCD-EFGH-AAAB']
+    assert attempts == ['ABCD-EFGH-IJKL', 'ABCD-EFGH-AAAA', 'ABCD-EFGH-AAAB']
+
+
+def test_try_code_fails_when_code_base_is_not_already_used(tmp_path, monkeypatch):
+    attempts = []
+    command = TryCode(
+        code_base='ABCD-EFGH-IJKL',
+        cookie='session=value',
+        dry_run=False,
+        state_file=tmp_path / 'state.json',
+        config=tmp_path / 'config.toml',
+    )
+    command.config.write_text('')
+
+    def fake_send_code(code):
+        attempts.append(code)
+        return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
+
+    monkeypatch.setattr(command, 'send_code', fake_send_code)
+
+    with pytest.raises(click.ClickException) as error:
+        command()
+
+    assert attempts == ['ABCD-EFGH-IJKL']
+    assert 'Code base check failed for ABCD-EFGH-IJKL' in str(error.value)
+    assert '"code.already.used"' in str(error.value)
 
 
 def test_try_code_uses_configured_request_delay(tmp_path, monkeypatch):
@@ -153,7 +185,9 @@ def test_try_code_uses_configured_request_delay(tmp_path, monkeypatch):
 
     def fake_send_code(code):
         attempts.append(code)
-        if len(attempts) == 1:
+        if code == command.code_base:
+            return CodeResponse(text='{"error":"code.already.used"}', headers={'Content-Type': 'application/json'})
+        if len(attempts) == 2:
             return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
         return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
 
@@ -180,7 +214,9 @@ def test_try_code_skips_request_delay_when_zero(tmp_path, monkeypatch):
 
     def fake_send_code(code):
         attempts.append(code)
-        if len(attempts) == 1:
+        if code == command.code_base:
+            return CodeResponse(text='{"error":"code.already.used"}', headers={'Content-Type': 'application/json'})
+        if len(attempts) == 2:
             return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
         return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
 
@@ -244,6 +280,8 @@ def test_default_state_file_sits_next_to_config_file(tmp_path, monkeypatch):
 
     def fake_send_code(self, code):
         attempts.append(code)
+        if code == self.code_base:
+            return CodeResponse(text='{"error":"code.already.used"}', headers={'Content-Type': 'application/json'})
         return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
 
     monkeypatch.setattr(TryCode, 'send_code', fake_send_code)
@@ -251,7 +289,7 @@ def test_default_state_file_sits_next_to_config_file(tmp_path, monkeypatch):
     result = CliRunner().invoke(CLI.click, ['try-code', '--config', str(config)])
 
     assert result.exit_code == 0
-    assert attempts == ['ABCD-EFGH-AAAA']
+    assert attempts == ['ABCD-EFGH-IJKL', 'ABCD-EFGH-AAAA']
     assert 'Response headers:\nContent-Type: application/json\nResponse text:\n{"ok":true}\n' in result.output
     assert (config.parent / DEFAULT_STATE_FILE).exists()
 
