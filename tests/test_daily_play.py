@@ -69,7 +69,7 @@ class DailyPlayTestCase(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn('--cookie', result.output)
-        self.assertNotIn('--endpoint', result.output)
+        self.assertNotIn('--api-endpoint', result.output)
         self.assertNotIn('--dry-run', result.output)
         self.assertNotIn('--timeout', result.output)
         self.assertNotIn('--env', result.output)

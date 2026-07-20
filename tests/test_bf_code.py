@@ -8,12 +8,12 @@ from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
 from fifa_panini.commands.bf_code import BfCode
-from fifa_panini.commands.panini import DEFAULT_ENDPOINT
+from fifa_panini.commands.panini import API_ENDPOINT
 from fifa_panini.commands.try_code import DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse
 
 
-def panini_settings(cookie='session=value', endpoint=DEFAULT_ENDPOINT):
-    return {'cookie': cookie, 'endpoint': endpoint}
+def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
+    return {'cookie': cookie, 'api_endpoint': api_endpoint}
 
 
 class BfCodeTestCase(unittest.TestCase):
@@ -66,8 +66,8 @@ class BfCodeTestCase(unittest.TestCase):
                 'panini',
                 '--cookie',
                 'session=value',
-                '--endpoint',
-                'https://example.test/redeem',
+                '--api-endpoint',
+                'https://example.test/api/',
                 'bf',
                 '--dry-run',
                 '--code-base',
@@ -76,7 +76,7 @@ class BfCodeTestCase(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'DRY RUN POST https://example.test/redeem code=ABCD-EFGH-AAAA\n')
+        self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-AAAA\n')
 
     def test_panini_group_owns_shared_options(self):
         group_help = CliRunner().invoke(CLI.click, ['panini', '--help'])
@@ -85,15 +85,15 @@ class BfCodeTestCase(unittest.TestCase):
 
         self.assertEqual(group_help.exit_code, 0)
         self.assertIn('--cookie', group_help.output)
-        self.assertIn('--endpoint', group_help.output)
+        self.assertIn('--api-endpoint', group_help.output)
 
         self.assertEqual(try_help.exit_code, 0)
         self.assertNotIn('--cookie', try_help.output)
-        self.assertNotIn('--endpoint', try_help.output)
+        self.assertNotIn('--api-endpoint', try_help.output)
 
         self.assertEqual(bf_help.exit_code, 0)
         self.assertNotIn('--cookie', bf_help.output)
-        self.assertNotIn('--endpoint', bf_help.output)
+        self.assertNotIn('--api-endpoint', bf_help.output)
 
     def test_resumes_from_state_file(self):
         state_file = self.tmp_path / 'state.json'
@@ -276,7 +276,7 @@ class BfCodeTestCase(unittest.TestCase):
                 [
                     '[panini]',
                     'cookie = "session=value"',
-                    'endpoint = "https://example.test/redeem"',
+                    'api_endpoint = "https://example.test/api/"',
                     '[panini.bf]',
                     'code_base = "ABCD-EFGH-IJKL"',
                     f'state_file = "{self.tmp_path / "state.json"}"',
@@ -288,7 +288,7 @@ class BfCodeTestCase(unittest.TestCase):
         result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf', '--dry-run'])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'DRY RUN POST https://example.test/redeem code=ABCD-EFGH-AAAA\n')
+        self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-AAAA\n')
 
     def test_default_state_file_sits_next_to_config_file(self):
         config = self.tmp_path / 'settings' / 'config.toml'

@@ -6,7 +6,7 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from .panini import PANINI_COOKIE_META_KEY, PANINI_ENDPOINT_META_KEY, Panini
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 from .try_code import (
     CODE_ALREADY_USED_MARKER,
     DEFAULT_REQUEST_DELAY,
@@ -25,7 +25,7 @@ class BfCode(CodeMethodsMixin, Panini.Command):
     __config__ = classyclick.Command.Config(name='bf')
 
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
-    endpoint: str = classyclick.ContextMeta(PANINI_ENDPOINT_META_KEY)
+    api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     code_base: str = classyclick.Option(
         help='Promo code base in XXXX-XXXX-XXXX format; the final block is iterated.',
     )
@@ -54,7 +54,7 @@ class BfCode(CodeMethodsMixin, Panini.Command):
 
         if self.dry_run:
             code = self.next_code()
-            tqdm.write(f'DRY RUN POST {self.endpoint} code={code}')
+            tqdm.write(f'DRY RUN POST {self.unlock_pack_endpoint} code={code}')
             return
 
         self.check_code_base()
