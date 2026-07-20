@@ -28,6 +28,17 @@ class CodeResponse:
     headers: dict[str, str]
 
 
+def validate_cookie_header(cookie):
+    try:
+        cookie.encode('latin-1')
+    except UnicodeEncodeError as error:
+        character = error.object[error.start : error.end].encode('unicode_escape').decode('ascii')
+        raise click.ClickException(
+            f'Cookie contains {character}, which cannot be sent in an HTTP header. '
+            'Re-copy the complete Cookie header from browser developer tools; copied previews are often truncated.'
+        ) from error
+
+
 class CodeMethodsMixin:
     def validate_code(self, code, option_name):
         if not CODE_PATTERN.fullmatch(code):
@@ -43,6 +54,7 @@ class CodeMethodsMixin:
         tqdm.write(response.text, end='' if response.text.endswith('\n') else '\n')
 
     def send_code(self, code):
+        validate_cookie_header(self.cookie)
         payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
         request = Request(
             self.endpoint,
@@ -137,4 +149,5 @@ class TryCode(CodeMethodsMixin, CLI.Command):
                 f'Missing required setting(s): {", ".join(missing)}. '
                 f'Pass them as options or save them in the config file.'
             )
+        validate_cookie_header(self.cookie)
         self.validate_code(self.code, '--code')

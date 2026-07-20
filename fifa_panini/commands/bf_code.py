@@ -16,6 +16,7 @@ from .try_code import (
     SUFFIX_ALPHABET,
     TOTAL_SUFFIXES,
     CodeMethodsMixin,
+    validate_cookie_header,
 )
 
 
@@ -90,6 +91,7 @@ class BfCode(CodeMethodsMixin, CLI.Command):
                 f'Missing required setting(s): {", ".join(missing)}. '
                 f'Pass them as options or save them in the config file.'
             )
+        validate_cookie_header(self.cookie)
         self.validate_code(self.code_base, '--code-base')
         if self.request_delay < 0:
             raise click.ClickException('--request-delay must be greater than or equal to 0.')
