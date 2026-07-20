@@ -9,7 +9,7 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url, validate_cookie_header
 
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 DEFAULT_REQUEST_DELAY = 1.0
@@ -26,17 +26,6 @@ TOTAL_SUFFIXES = len(SUFFIX_ALPHABET) ** 4
 class CodeResponse:
     text: str
     headers: dict[str, str]
-
-
-def validate_cookie_header(cookie):
-    try:
-        cookie.encode('latin-1')
-    except UnicodeEncodeError as error:
-        character = error.object[error.start : error.end].encode('unicode_escape').decode('ascii')
-        raise click.ClickException(
-            f'Cookie contains {character}, which cannot be sent in an HTTP header. '
-            'Re-copy the complete Cookie header from browser developer tools; copied previews are often truncated.'
-        ) from error
 
 
 class CodeMethodsMixin:

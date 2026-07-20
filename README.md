@@ -22,6 +22,12 @@ $ fifa-panini panini --cookie 'session=value; other=value' bf --dry-run --code-b
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-AAAA
 ```
 
+Claim the current daily Panini packs:
+
+```
+$ fifa-panini panini --cookie 'session=value; other=value' claim
+```
+
 Fetch the daily promo code from FIFA Play:
 
 ```

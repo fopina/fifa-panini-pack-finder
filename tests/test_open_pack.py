@@ -6,7 +6,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.panini import API_ENDPOINT, OPEN_PACK_BODY, OpenPack
+from fifa_panini.commands.open_pack import OPEN_PACK_BODY, OpenPack
+from fifa_panini.commands.panini import API_ENDPOINT
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -76,7 +77,7 @@ class OpenPackTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.urlopen', fake_urlopen):
+        with patch('fifa_panini.commands.open_pack.urlopen', fake_urlopen):
             response = command.open_pack()
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/open_pack.json')
