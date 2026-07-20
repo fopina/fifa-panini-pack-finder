@@ -417,7 +417,9 @@ def test_cli_exposes_daily_code_command(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0
-    assert result.output == 'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n'
+    assert (
+        result.output == 'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n'
+    )
     request, timeout = requests[0]
     assert request.full_url == DEFAULT_DAILY_CODE_ENDPOINT
     assert request.get_method() == 'GET'
@@ -487,7 +489,9 @@ def test_daily_code_loads_settings_from_config(tmp_path, monkeypatch):
     result = CliRunner().invoke(CLI.click, ['--config', str(config), 'daily-code'])
 
     assert result.exit_code == 0
-    assert result.output == 'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n'
+    assert (
+        result.output == 'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n'
+    )
     assert requests[0][0].get_header('Cookie') == 'session=value'
 
 
