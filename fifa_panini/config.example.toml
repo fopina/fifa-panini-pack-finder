@@ -1,19 +1,18 @@
-[try-code]
-code = ""
-# same as bf-code - taken from paninicollection.fifa.com
+[panini]
+# taken from paninicollection.fifa.com
 cookie = "_panstwc_session=....; _abck=...."
 # endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
+
+[panini.try]
+code = ""
 # request_timeout = 30.0
 
-[bf-code]
+[panini.bf]
 code_base = ""
-# same as try-code - taken from paninicollection.fifa.com
-cookie = "_panstwc_session=....; _abck=...."
-# endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
 # state_file = ".fifa-panini-try-code-state.json"
 # request_timeout = 30.0
 # request_delay = 1.0
 
-[daily-code]
+[daily-play]
 # taken from play.fifa.com
 cookie = "_panstwc_session=....; _abck=...."

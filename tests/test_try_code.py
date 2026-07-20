@@ -6,7 +6,12 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
+from fifa_panini.commands.panini import DEFAULT_ENDPOINT
 from fifa_panini.commands.try_code import CodeResponse, TryCode
+
+
+def panini_settings(cookie='session=value', endpoint=DEFAULT_ENDPOINT):
+    return {'cookie': cookie, 'endpoint': endpoint}
 
 
 class TryCodeTestCase(unittest.TestCase):
@@ -28,12 +33,13 @@ class TryCodeTestCase(unittest.TestCase):
             [
                 '--config',
                 str(config),
-                'try-code',
-                '--dry-run',
+                'panini',
                 '--cookie',
                 'session=value',
                 '--endpoint',
                 'https://example.test/redeem',
+                'try',
+                '--dry-run',
                 '--code',
                 'ABCD-EFGH-IJKL',
             ],
@@ -46,8 +52,8 @@ class TryCodeTestCase(unittest.TestCase):
         attempts = []
         command = TryCode(
             code='ABCD-EFGH-IJKL',
-            cookie='session=value',
             dry_run=False,
+            **panini_settings(),
         )
 
         def fake_send_code(code):
@@ -67,10 +73,11 @@ class TryCodeTestCase(unittest.TestCase):
             [
                 '--config',
                 str(config),
-                'try-code',
-                '--dry-run',
+                'panini',
                 '--cookie',
                 'session=abc\u2026',
+                'try',
+                '--dry-run',
                 '--code',
                 'ABCD-EFGH-IJKL',
             ],
@@ -83,15 +90,16 @@ class TryCodeTestCase(unittest.TestCase):
         config = self.write_config(
             '\n'.join(
                 [
-                    '[try-code]',
-                    'code = "ABCD-EFGH-IJKL"',
+                    '[panini]',
                     'cookie = "session=value"',
                     'endpoint = "https://example.test/redeem"',
+                    '[panini.try]',
+                    'code = "ABCD-EFGH-IJKL"',
                 ]
             )
         )
 
-        result = CliRunner().invoke(CLI.click, ['--config', str(config), 'try-code', '--dry-run'])
+        result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'try', '--dry-run'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.output, 'DRY RUN POST https://example.test/redeem code=ABCD-EFGH-IJKL\n')

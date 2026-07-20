@@ -6,17 +6,17 @@ import click
 from ..cli import CLI
 from .try_code import CodeResponse, validate_cookie_header
 
-DEFAULT_DAILY_CODE_ENDPOINT = 'https://play.fifa.com/api/en/gamezone/panini/code'
+DEFAULT_DAILY_PLAY_ENDPOINT = 'https://play.fifa.com/api/en/gamezone/panini/code'
 DEFAULT_REQUEST_TIMEOUT = 30.0
 
 
-class DailyCode(CLI.Command):
-    """Fetch the current FIFA Panini daily promo code."""
+class DailyPlay(CLI.Command):
+    """Fetch the current FIFA Play daily promo code."""
 
     cookie: str = classyclick.Option(
         '-c',
         '--cookie',
-        help='Complete Cookie header value copied from the daily code browser request.',
+        help='Complete Cookie header value copied from the daily Play code browser request.',
     )
 
     def __call__(self):
@@ -41,7 +41,7 @@ class DailyCode(CLI.Command):
 
     def send_code(self):
         request = Request(
-            DEFAULT_DAILY_CODE_ENDPOINT,
+            DEFAULT_DAILY_PLAY_ENDPOINT,
             headers={
                 'Cookie': self.cookie,
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0',
@@ -58,4 +58,4 @@ class DailyCode(CLI.Command):
                     headers=dict(response.headers.items()),
                 )
         except OSError as error:
-            raise click.ClickException(f'Request failed for {DEFAULT_DAILY_CODE_ENDPOINT}: {error}') from error
+            raise click.ClickException(f'Request failed for {DEFAULT_DAILY_PLAY_ENDPOINT}: {error}') from error
