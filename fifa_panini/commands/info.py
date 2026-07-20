@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
 
@@ -21,6 +22,7 @@ class Info(Panini.Command):
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    raw: bool = classyclick.Option('--raw', default=False, help='Print the complete JSON response.')
     request_timeout: float = classyclick.Option(
         '--timeout',
         default=30.0,
@@ -79,4 +81,63 @@ class Info(Panini.Command):
             raise click.ClickException(f'Request failed for info: {error}') from error
 
     def print_response(self, response):
-        click.echo(response.text, nl=not response.text.endswith('\n'))
+        if self.raw:
+            click.echo(response.text, nl=not response.text.endswith('\n'))
+            return
+
+        try:
+            actions = json.loads(response.text)
+        except json.JSONDecodeError as error:
+            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+
+        if not isinstance(actions, list):
+            raise click.ClickException('Response JSON must be an array of action objects.')
+
+        self.print_summary(actions)
+
+    def print_summary(self, actions):
+        received_packs = self.action(actions, 'received_packs')
+        user_info = self.action(actions, 'own_user_info').get('user_info', {})
+        init = self.action(actions, 'init')
+
+        if received_packs:
+            click.echo(f'Available packs: {received_packs.get("total_packs", received_packs.get("amount", 0))}')
+
+        if user_info:
+            label = user_info.get('label') or user_info.get('uid') or 'unknown'
+            country = user_info.get('country')
+            click.echo(f'User: {label}' + (f' ({country})' if country else ''))
+            public_profile = user_info.get('public_profile') or {}
+            if public_profile.get('url'):
+                click.echo(f'Public profile: {public_profile["url"]}')
+            click.echo(f'Collector points: {user_info.get("collector_points", 0)}')
+            click.echo(
+                'Album: '
+                f'{user_info.get("album_collected_stickers", 0)}/{user_info.get("album_total_stickers", 0)} '
+                f'({user_info.get("album_completion_perc", 0)}%)'
+            )
+            click.echo(
+                'Golden album: '
+                f'{user_info.get("golden_album_collected_stickers", 0)}/'
+                f'{user_info.get("golden_album_total_stickers", 0)} '
+                f'({user_info.get("golden_album_completion_perc", 0)}%)'
+            )
+
+        if init:
+            click.echo(f'Album completed: {self.yes_no(init.get("album_completed"))}')
+            stacks = init.get('stacks') or {}
+            for name in sorted(stacks):
+                click.echo(f'{name} stickers: {len(stacks[name])}')
+            click.echo(f'Completed groups: {len(init.get("completed_groups") or [])}')
+            click.echo(f'Received swaps: {len(init.get("received_swaps") or [])}')
+
+    @staticmethod
+    def action(actions, name):
+        for action in actions:
+            if isinstance(action, dict) and action.get('action') == name:
+                return action
+        return {}
+
+    @staticmethod
+    def yes_no(value):
+        return 'yes' if value else 'no'
