@@ -22,6 +22,12 @@ $ fifa-panini bf-code --dry-run --cookie 'session=value; other=value' --code-bas
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-AAAA
 ```
 
+Fetch the daily promo code:
+
+```
+$ fifa-panini daily-code --cookie 'session=value; other=value'
+```
+
 Persist settings in the classyclick config file:
 
 ```

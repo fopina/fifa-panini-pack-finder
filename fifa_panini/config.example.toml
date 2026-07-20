@@ -11,3 +11,6 @@ cookie = "_panstwc_session=....; _abck=...."
 # state_file = ".fifa-panini-try-code-state.json"
 # request_timeout = 30.0
 # request_delay = 1.0
+
+[daily-code]
+cookie = "_panstwc_session=....; _abck=...."
