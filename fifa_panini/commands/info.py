@@ -4,14 +4,8 @@ from urllib.request import Request, urlopen
 import classyclick
 import click
 
-from .panini import (
-    OPEN_PACK_BODY,
-    PANINI_API_ENDPOINT_META_KEY,
-    PANINI_COOKIE_META_KEY,
-    Panini,
-    api_url,
-    validate_cookie_header,
-)
+from .open_pack import OPEN_PACK_BODY
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url, validate_cookie_header
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,8 @@ from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
 from fifa_panini.commands.info import Info, InfoResponse
-from fifa_panini.commands.panini import API_ENDPOINT, OPEN_PACK_BODY
+from fifa_panini.commands.open_pack import OPEN_PACK_BODY
+from fifa_panini.commands.panini import API_ENDPOINT
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
