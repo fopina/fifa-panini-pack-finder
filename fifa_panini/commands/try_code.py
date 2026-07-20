@@ -9,9 +9,8 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from ..cli import CLI
+from .panini import PANINI_COOKIE_META_KEY, PANINI_ENDPOINT_META_KEY, Panini
 
-DEFAULT_ENDPOINT = 'https://paninicollection.fifa.com/api/unlock_pack.json'
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 DEFAULT_REQUEST_DELAY = 1.0
 INVALID_CODE_MARKER = '"code.invalid"'
@@ -108,21 +107,15 @@ class CodeMethodsMixin:
         return Path(config_path)
 
 
-class TryCode(CodeMethodsMixin, CLI.Command):
+class TryCode(CodeMethodsMixin, Panini.Command):
     """Try one FIFA Panini promo code."""
 
+    __config__ = classyclick.Command.Config(name='try')
+
+    cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
+    endpoint: str = classyclick.ContextMeta(PANINI_ENDPOINT_META_KEY)
     code: str = classyclick.Option(
         help='Promo code in XXXX-XXXX-XXXX format.',
-    )
-    cookie: str = classyclick.Option(
-        '-c',
-        '--cookie',
-        help='Complete Cookie header value copied from the browser request.',
-    )
-    endpoint: str = classyclick.Option(
-        default=DEFAULT_ENDPOINT,
-        show_default=True,
-        help='Endpoint URL to test against.',
     )
     dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(

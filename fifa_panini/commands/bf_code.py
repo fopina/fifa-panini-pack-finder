@@ -6,10 +6,9 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from ..cli import CLI
+from .panini import PANINI_COOKIE_META_KEY, PANINI_ENDPOINT_META_KEY, Panini
 from .try_code import (
     CODE_ALREADY_USED_MARKER,
-    DEFAULT_ENDPOINT,
     DEFAULT_REQUEST_DELAY,
     DEFAULT_STATE_FILE,
     INVALID_CODE_MARKER,
@@ -20,21 +19,15 @@ from .try_code import (
 )
 
 
-class BfCode(CodeMethodsMixin, CLI.Command):
+class BfCode(CodeMethodsMixin, Panini.Command):
     """Brute-force FIFA Panini promo codes by iterating the final block."""
 
+    __config__ = classyclick.Command.Config(name='bf')
+
+    cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
+    endpoint: str = classyclick.ContextMeta(PANINI_ENDPOINT_META_KEY)
     code_base: str = classyclick.Option(
         help='Promo code base in XXXX-XXXX-XXXX format; the final block is iterated.',
-    )
-    cookie: str = classyclick.Option(
-        '-c',
-        '--cookie',
-        help='Complete Cookie header value copied from the browser request.',
-    )
-    endpoint: str = classyclick.Option(
-        default=DEFAULT_ENDPOINT,
-        show_default=True,
-        help='Endpoint URL to test against.',
     )
     state_file: Path = classyclick.Option(
         '-s',

@@ -6,11 +6,11 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.daily_code import DEFAULT_DAILY_CODE_ENDPOINT, DailyCode
+from fifa_panini.commands.daily_play import DEFAULT_DAILY_PLAY_ENDPOINT, DailyPlay
 from fifa_panini.commands.try_code import CodeResponse
 
 
-class DailyCodeTestCase(unittest.TestCase):
+class DailyPlayTestCase(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -41,13 +41,13 @@ class DailyCodeTestCase(unittest.TestCase):
             requests.append((request, timeout))
             return FakeResponse()
 
-        with patch('fifa_panini.commands.daily_code.urlopen', fake_urlopen):
+        with patch('fifa_panini.commands.daily_play.urlopen', fake_urlopen):
             result = CliRunner().invoke(
                 CLI.click,
                 [
                     '--config',
                     str(config),
-                    'daily-code',
+                    'daily-play',
                     '--cookie',
                     'session=value',
                 ],
@@ -59,13 +59,13 @@ class DailyCodeTestCase(unittest.TestCase):
             'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n',
         )
         request, timeout = requests[0]
-        self.assertEqual(request.full_url, DEFAULT_DAILY_CODE_ENDPOINT)
+        self.assertEqual(request.full_url, DEFAULT_DAILY_PLAY_ENDPOINT)
         self.assertEqual(request.get_method(), 'GET')
         self.assertEqual(request.get_header('Cookie'), 'session=value')
         self.assertEqual(timeout, 30.0)
 
     def test_hides_unused_flags(self):
-        result = CliRunner().invoke(CLI.click, ['daily-code', '--help'])
+        result = CliRunner().invoke(CLI.click, ['daily-play', '--help'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn('--cookie', result.output)
@@ -75,7 +75,7 @@ class DailyCodeTestCase(unittest.TestCase):
         self.assertNotIn('--env', result.output)
 
     def test_fetches_current_code(self):
-        command = DailyCode(
+        command = DailyPlay(
             cookie='session=value',
         )
         calls = 0
@@ -94,7 +94,7 @@ class DailyCodeTestCase(unittest.TestCase):
         config = self.write_config(
             '\n'.join(
                 [
-                    '[daily-code]',
+                    '[daily-play]',
                     'cookie = "session=value"',
                 ]
             )
@@ -117,8 +117,8 @@ class DailyCodeTestCase(unittest.TestCase):
             requests.append((request, timeout))
             return FakeResponse()
 
-        with patch('fifa_panini.commands.daily_code.urlopen', fake_urlopen):
-            result = CliRunner().invoke(CLI.click, ['--config', str(config), 'daily-code'])
+        with patch('fifa_panini.commands.daily_play.urlopen', fake_urlopen):
+            result = CliRunner().invoke(CLI.click, ['--config', str(config), 'daily-play'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(
@@ -135,7 +135,7 @@ class DailyCodeTestCase(unittest.TestCase):
             [
                 '--config',
                 str(config),
-                'daily-code',
+                'daily-play',
             ],
         )
 
@@ -150,7 +150,7 @@ class DailyCodeTestCase(unittest.TestCase):
             [
                 '--config',
                 str(config),
-                'daily-code',
+                'daily-play',
                 '--cookie',
                 'session=abc\u2026',
             ],

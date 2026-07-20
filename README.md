@@ -11,33 +11,33 @@ pip install fifa-panini
 ## Usage
 
 ```
-$ fifa-panini try-code --dry-run --cookie 'session=value; other=value' --code VD13-V24K-ABCD
+$ fifa-panini panini --cookie 'session=value; other=value' try --dry-run --code VD13-V24K-ABCD
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-ABCD
 ```
 
 Brute-force the final block from a known-used code base:
 
 ```
-$ fifa-panini bf-code --dry-run --cookie 'session=value; other=value' --code-base VD13-V24K-0000
+$ fifa-panini panini --cookie 'session=value; other=value' bf --dry-run --code-base VD13-V24K-0000
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-AAAA
 ```
 
-Fetch the daily promo code:
+Fetch the daily promo code from FIFA Play:
 
 ```
-$ fifa-panini daily-code --cookie 'session=value; other=value'
+$ fifa-panini daily-play --cookie 'session=value; other=value'
 ```
 
 Persist settings in the classyclick config file:
 
 ```
 $ fifa-panini config -e
-$ fifa-panini bf-code --dry-run
+$ fifa-panini panini bf --dry-run
 ```
 
 ```python
 >>> from fifa_panini.commands.bf_code import BfCode
->>> BfCode(code_base='VD13-V24K-0000', cookie='session=value').next_code()
+>>> BfCode(code_base='VD13-V24K-0000').next_code()
 'VD13-V24K-AAAA'
 ```
 
