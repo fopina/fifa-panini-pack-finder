@@ -1,3 +1,10 @@
+[try-code]
+code = ""
+cookie = "_panstwc_session=....; _abck=...."
+# endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
+# request_timeout = 30.0
+
+[bf-code]
 code_base = ""
 cookie = "_panstwc_session=....; _abck=...."
 # endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
