@@ -13,6 +13,9 @@ code_base = ""
 # request_timeout = 30.0
 # request_delay = 1.0
 
+[panini.claim]
+# request_timeout = 30.0
+
 [daily-play]
 # taken from play.fifa.com
 cookie = "_panstwc_session=....; _abck=...."

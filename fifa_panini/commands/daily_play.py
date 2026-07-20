@@ -4,7 +4,8 @@ import classyclick
 import click
 
 from ..cli import CLI
-from .try_code import CodeResponse, validate_cookie_header
+from .panini import validate_cookie_header
+from .try_code import CodeResponse
 
 DEFAULT_DAILY_PLAY_ENDPOINT = 'https://play.fifa.com/api/en/gamezone/panini/code'
 DEFAULT_REQUEST_TIMEOUT = 30.0
