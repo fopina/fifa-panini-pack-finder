@@ -1,6 +1,6 @@
 # fifa-panini
 
-CLI for trying FIFA Panini promo codes against an endpoint.
+CLI for trying FIFA Panini promo codes against the API.
 
 ## Install
 

@@ -1,7 +1,7 @@
 [panini]
 # taken from paninicollection.fifa.com
 cookie = "_panstwc_session=....; _abck=...."
-# endpoint = "https://paninicollection.fifa.com/api/unlock_pack.json"
+# api_endpoint = "https://paninicollection.fifa.com/api/"
 
 [panini.try]
 code = ""

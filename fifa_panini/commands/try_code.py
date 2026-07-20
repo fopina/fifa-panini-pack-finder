@@ -9,10 +9,11 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from .panini import PANINI_COOKIE_META_KEY, PANINI_ENDPOINT_META_KEY, Panini
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url
 
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 DEFAULT_REQUEST_DELAY = 1.0
+UNLOCK_PACK_PATH = 'unlock_pack.json'
 INVALID_CODE_MARKER = '"code.invalid"'
 CODE_ALREADY_USED_MARKER = '"code.already_used"'
 CODE_PATTERN = re.compile(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$')
@@ -39,6 +40,10 @@ def validate_cookie_header(cookie):
 
 
 class CodeMethodsMixin:
+    @property
+    def unlock_pack_endpoint(self):
+        return api_url(self.api_endpoint, UNLOCK_PACK_PATH)
+
     def validate_code(self, code, option_name):
         if not CODE_PATTERN.fullmatch(code):
             raise click.ClickException(
@@ -56,7 +61,7 @@ class CodeMethodsMixin:
         validate_cookie_header(self.cookie)
         payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
         request = Request(
-            self.endpoint,
+            self.unlock_pack_endpoint,
             data=payload,
             headers={
                 'Cookie': self.cookie,
@@ -113,7 +118,7 @@ class TryCode(CodeMethodsMixin, Panini.Command):
     __config__ = classyclick.Command.Config(name='try')
 
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
-    endpoint: str = classyclick.ContextMeta(PANINI_ENDPOINT_META_KEY)
+    api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     code: str = classyclick.Option(
         help='Promo code in XXXX-XXXX-XXXX format.',
     )
@@ -129,7 +134,7 @@ class TryCode(CodeMethodsMixin, Panini.Command):
         self.validate_settings()
 
         if self.dry_run:
-            tqdm.write(f'DRY RUN POST {self.endpoint} code={self.code}')
+            tqdm.write(f'DRY RUN POST {self.unlock_pack_endpoint} code={self.code}')
             return
 
         response = self.send_code(self.code)

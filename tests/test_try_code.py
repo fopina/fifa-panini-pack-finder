@@ -6,12 +6,12 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.panini import DEFAULT_ENDPOINT
+from fifa_panini.commands.panini import API_ENDPOINT
 from fifa_panini.commands.try_code import CodeResponse, TryCode
 
 
-def panini_settings(cookie='session=value', endpoint=DEFAULT_ENDPOINT):
-    return {'cookie': cookie, 'endpoint': endpoint}
+def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
+    return {'cookie': cookie, 'api_endpoint': api_endpoint}
 
 
 class TryCodeTestCase(unittest.TestCase):
@@ -36,8 +36,8 @@ class TryCodeTestCase(unittest.TestCase):
                 'panini',
                 '--cookie',
                 'session=value',
-                '--endpoint',
-                'https://example.test/redeem',
+                '--api-endpoint',
+                'https://example.test/api/',
                 'try',
                 '--dry-run',
                 '--code',
@@ -46,7 +46,7 @@ class TryCodeTestCase(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'DRY RUN POST https://example.test/redeem code=ABCD-EFGH-IJKL\n')
+        self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-IJKL\n')
 
     def test_sends_only_passed_code(self):
         attempts = []
@@ -92,7 +92,7 @@ class TryCodeTestCase(unittest.TestCase):
                 [
                     '[panini]',
                     'cookie = "session=value"',
-                    'endpoint = "https://example.test/redeem"',
+                    'api_endpoint = "https://example.test/api/"',
                     '[panini.try]',
                     'code = "ABCD-EFGH-IJKL"',
                 ]
@@ -102,4 +102,4 @@ class TryCodeTestCase(unittest.TestCase):
         result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'try', '--dry-run'])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'DRY RUN POST https://example.test/redeem code=ABCD-EFGH-IJKL\n')
+        self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-IJKL\n')
