@@ -22,24 +22,19 @@ MOVE_STICKERS_PATH = 'move_stickers.json'
 class Stickers(Panini.Command):
     """Print FIFA Panini sticker lists from the current collection state."""
 
-    __config__ = classyclick.Command.Config(name='stickers')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     move: str = classyclick.Option(
         '--move',
-        default='',
         help='Sticker numbers to move from temp to swap, comma separated.',
     )
     swap_out: str = classyclick.Option(
         '--swap-out',
-        default='',
         help='Sticker numbers in the other player album, comma separated.',
     )
     swap_in: str = classyclick.Option(
         '--swap-in',
-        default='',
         help='Sticker numbers in the other player duplicates, comma separated.',
     )
     swap_new: bool = classyclick.Option(

@@ -19,11 +19,9 @@ CLAIM_PACKS_PATH = 'receive_daily_packs.json'
 class Claim(Panini.Command):
     """Claim the current FIFA Panini daily packs."""
 
-    __config__ = classyclick.Command.Config(name='claim')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
         default=DEFAULT_REQUEST_TIMEOUT,

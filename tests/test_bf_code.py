@@ -52,7 +52,7 @@ class BfCodeTestCase(unittest.TestCase):
                 'panini',
                 '--cookie',
                 'session=value',
-                'bf',
+                'bf-code',
                 '--dry-run',
                 '--code-base',
                 'ABCD-EFGH-ijkl',
@@ -75,7 +75,7 @@ class BfCodeTestCase(unittest.TestCase):
                 'session=value',
                 '--api-endpoint',
                 'https://example.test/api/',
-                'bf',
+                'bf-code',
                 '--dry-run',
                 '--code-base',
                 'ABCD-EFGH-IJKL',
@@ -87,8 +87,8 @@ class BfCodeTestCase(unittest.TestCase):
 
     def test_panini_group_owns_shared_options(self):
         group_help = CliRunner().invoke(CLI.click, ['panini', '--help'])
-        try_help = CliRunner().invoke(CLI.click, ['panini', 'try', '--help'])
-        bf_help = CliRunner().invoke(CLI.click, ['panini', 'bf', '--help'])
+        try_help = CliRunner().invoke(CLI.click, ['panini', 'try-code', '--help'])
+        bf_help = CliRunner().invoke(CLI.click, ['panini', 'bf-code', '--help'])
 
         self.assertEqual(group_help.exit_code, 0)
         self.assertIn('--cookie', group_help.output)
@@ -270,7 +270,7 @@ class BfCodeTestCase(unittest.TestCase):
                 'panini',
                 '--cookie',
                 'session=value',
-                'bf',
+                'bf-code',
                 '--dry-run',
                 '--code-base',
                 'ABCD-EFGH-IJKL',
@@ -288,7 +288,7 @@ class BfCodeTestCase(unittest.TestCase):
                     '[panini]',
                     'cookie = "session=value"',
                     'api_endpoint = "https://example.test/api/"',
-                    '[panini.bf]',
+                    '[panini.bf-code]',
                     'code_base = "ABCD-EFGH-IJKL"',
                     f'state_file = "{self.tmp_path / "state.json"}"',
                     'request_delay = 0',
@@ -296,7 +296,7 @@ class BfCodeTestCase(unittest.TestCase):
             )
         )
 
-        result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf', '--dry-run'])
+        result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf-code', '--dry-run'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-AAAA\n')
@@ -304,7 +304,7 @@ class BfCodeTestCase(unittest.TestCase):
     def test_default_state_file_sits_next_to_config_file(self):
         config = self.tmp_path / 'settings' / 'config.toml'
         config.parent.mkdir()
-        config.write_text('[panini]\ncookie = "session=value"\n[panini.bf]\ncode_base = "ABCD-EFGH-IJKL"\n')
+        config.write_text('[panini]\ncookie = "session=value"\n[panini.bf-code]\ncode_base = "ABCD-EFGH-IJKL"\n')
         attempts = []
 
         def fake_send_code(self, code):
@@ -314,7 +314,7 @@ class BfCodeTestCase(unittest.TestCase):
             return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with patch.object(BfCode, 'send_code', fake_send_code):
-            result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf'])
+            result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf-code'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(attempts, ['ABCD-EFGH-IJKL', 'ABCD-EFGH-AAAA'])

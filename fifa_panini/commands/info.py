@@ -20,12 +20,10 @@ INFO_PATH = 'init.json'
 class Info(Panini.Command):
     """Print FIFA Panini collection info."""
 
-    __config__ = classyclick.Command.Config(name='info')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
-    raw: bool = classyclick.Option('--raw', default=False, help='Print the complete JSON response.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
+    raw: bool = classyclick.Option('--raw', help='Print the complete JSON response.')
     request_timeout: float = classyclick.Option(
         '--timeout',
         default=DEFAULT_REQUEST_TIMEOUT,

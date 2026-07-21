@@ -24,24 +24,19 @@ UPDATE_SWAP_REQUEST_PATH = 'update_swap_request.json'
 class Swap(Panini.Command):
     """Print stickers currently in the FIFA Panini swap stack."""
 
-    __config__ = classyclick.Command.Config(name='swap')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     delete: str = classyclick.Option(
         '--delete',
-        default='',
         help='Swap request ID to delete.',
     )
     create: str = classyclick.Option(
         '--create',
-        default='',
         help='Sticker numbers to request, comma separated.',
     )
     create_allow_duplicates: bool = classyclick.Option(
         '--create-allow-duplicates',
-        default=False,
         help='Allow duplicate stickers in the created swap request demand.',
     )
     request_timeout: float = classyclick.Option(
