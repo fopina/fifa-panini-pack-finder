@@ -3,7 +3,7 @@ import datetime as dt
 import classyclick
 import click
 
-from ..utils.actions import action, error_message, parse_action_list
+from ..utils.actions import action, action_with_status, error_message, parse_action_list
 from ..utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
     PaniniClient,
@@ -51,17 +51,22 @@ class Claim(Panini.Command):
     def print_response(self, response):
         actions = parse_action_list(response)
 
-        received_packs = self.action(actions, 'received_packs')
-        if not received_packs:
-            raise click.ClickException('Response did not include received pack information.')
+        receive_daily_packs = action_with_status(actions, 'receive_daily_packs')
+        if not receive_daily_packs:
+            raise click.ClickException('Response did not include receive daily pack information.')
 
         next_packs_message = self.next_packs_message(actions)
-        error_message = self.error_message(received_packs)
+
+        error_message = self.error_message(receive_daily_packs)
         if error_message:
             message = error_message
             if next_packs_message:
                 message = f'{message}. {next_packs_message}'
             raise click.ClickException(message)
+
+        received_packs = self.action(actions, 'received_packs')
+        if not received_packs:
+            raise click.ClickException('Response did not include received pack information.')
 
         click.echo(f'Claimed packs: {received_packs.get("amount", 0)}')
         click.echo(f'Total packs: {received_packs.get("total_packs", 0)}')
