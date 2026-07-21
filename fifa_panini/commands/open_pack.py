@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
@@ -97,6 +98,10 @@ class OpenPack(Panini.Command):
         if error_message:
             raise click.ClickException(error_message)
 
+        wait_message = self.wait_message(actions)
+        if wait_message:
+            raise click.ClickException(wait_message)
+
         open_pack = self.action(actions, 'open_pack')
         if not open_pack:
             raise click.ClickException('Response did not include opened pack information.')
@@ -122,3 +127,25 @@ class OpenPack(Panini.Command):
                 return error.get('message') or str(error)
             return str(error)
         return None
+
+    def wait_message(self, actions):
+        for action in actions:
+            if not isinstance(action, dict) or 'wait' not in action:
+                continue
+
+            wait = action['wait']
+            if not isinstance(wait, dict):
+                return str(wait)
+
+            reason = wait.get('reason') or str(wait)
+            countdown_seconds = wait.get('countdown_seconds')
+            if countdown_seconds is None:
+                return reason
+
+            available_at = self.current_time() + dt.timedelta(seconds=countdown_seconds)
+            return f'{reason} {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'
+        return None
+
+    @staticmethod
+    def current_time():
+        return dt.datetime.now().astimezone()

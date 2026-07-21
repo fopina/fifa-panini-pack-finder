@@ -1,3 +1,4 @@
+import datetime as dt
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +20,13 @@ BAD_OPEN_PACK_RESPONSE_TEXT = (
     '{"has_new_challenge":true,"has_just_completed_challenge":false,"num_available_challenges":1,'
     '"action":"challenge_summary"}]'
 )
+WAIT_OPEN_PACK_RESPONSE_TEXT = (
+    '[{"wait":{"reason":"You\'ve reached your daily limit of 4 packs.\\nPlease retry in:",'
+    '"countdown_seconds":69790},"action":"open_pack"},'
+    '{"has_new_challenge":true,"has_just_completed_challenge":false,"num_available_challenges":1,'
+    '"action":"challenge_summary"}]'
+)
+FIXED_TIME = dt.datetime(2026, 7, 21, 12, 0, 0, tzinfo=dt.timezone.utc)
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -153,6 +161,41 @@ class OpenPackTestCase(unittest.TestCase):
         self.assertNotIn('Response headers:', result.output)
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(BAD_OPEN_PACK_RESPONSE_TEXT, result.output)
+
+    def test_raises_click_exception_for_wait_response(self):
+        config = self.write_config()
+
+        with (
+            patch.object(
+                OpenPack,
+                'open_pack',
+                lambda _self: PackResponse(
+                    text=WAIT_OPEN_PACK_RESPONSE_TEXT,
+                    headers={'Content-Type': 'application/json'},
+                ),
+            ),
+            patch.object(OpenPack, 'current_time', staticmethod(lambda: FIXED_TIME)),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'open',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            "Error: You've reached your daily limit of 4 packs.\nPlease retry in: 2026-07-22 07:23:10 UTC\n",
+        )
+        self.assertNotIn('Response headers:', result.output)
+        self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(WAIT_OPEN_PACK_RESPONSE_TEXT, result.output)
 
     def test_loads_cookie_from_config(self):
         config = self.write_config('\n'.join(['[panini]', 'cookie = "session=value"']))
