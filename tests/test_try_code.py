@@ -65,6 +65,37 @@ class TryCodeTestCase(unittest.TestCase):
 
         self.assertEqual(attempts, ['ABCD-EFGH-IJKL'])
 
+    def test_send_code_posts_unlock_pack_payload(self):
+        captured = {}
+        command = TryCode(
+            code='ABCD-EFGH-IJKL',
+            dry_run=False,
+            **panini_settings(cookie='session=value'),
+        )
+
+        class FakeResponse:
+            headers = {'Content-Type': 'application/json'}
+            text = '{"ok":true}'
+
+        def fake_post(_session, url, data, headers, timeout):
+            captured['url'] = url
+            captured['data'] = data
+            captured['cookie'] = headers['Cookie']
+            captured['content_type'] = headers['Content-Type']
+            captured['timeout'] = timeout
+            return FakeResponse()
+
+        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
+            response = command.send_code('ABCD-EFGH-IJKL')
+
+        self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/unlock_pack.json')
+        self.assertEqual(captured['data'], {'json': '{"code":"ABCD-EFGH-IJKL"}', 'locale': 'en'})
+        self.assertEqual(captured['cookie'], 'session=value')
+        self.assertEqual(captured['content_type'], 'application/x-www-form-urlencoded')
+        self.assertEqual(captured['timeout'], 30.0)
+        self.assertEqual(response.text, '{"ok":true}')
+        self.assertEqual(response.headers, {'Content-Type': 'application/json'})
+
     def test_rejects_cookie_with_unicode_ellipsis(self):
         config = self.write_config()
 

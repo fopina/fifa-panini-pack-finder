@@ -1,17 +1,20 @@
 import json
-from dataclasses import dataclass
-from urllib.request import Request, urlopen
 
 import classyclick
 import click
 
-from .open_pack import OPEN_PACK_BODY
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url, validate_cookie_header
+from .panini import (
+    DEFAULT_REQUEST_TIMEOUT,
+    PANINI_API_ENDPOINT_META_KEY,
+    PANINI_COOKIE_META_KEY,
+    Panini,
+    PaniniClient,
+    PaniniResponse,
+    validate_cookie_header,
+)
 
-
-@dataclass(frozen=True)
-class InfoResponse:
-    text: str
+InfoResponse = PaniniResponse
+INFO_PATH = 'init.json'
 
 
 class Info(Panini.Command):
@@ -25,14 +28,18 @@ class Info(Panini.Command):
     raw: bool = classyclick.Option('--raw', default=False, help='Print the complete JSON response.')
     request_timeout: float = classyclick.Option(
         '--timeout',
-        default=30.0,
+        default=DEFAULT_REQUEST_TIMEOUT,
         show_default=True,
         help='HTTP request timeout in seconds.',
     )
 
     @property
+    def panini_client(self):
+        return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
+
+    @property
     def info_endpoint(self):
-        return api_url(self.api_endpoint, 'init.json')
+        return self.panini_client.endpoint(INFO_PATH)
 
     def __call__(self):
         self.validate_settings()
@@ -52,33 +59,7 @@ class Info(Panini.Command):
         validate_cookie_header(self.cookie)
 
     def get_info(self):
-        validate_cookie_header(self.cookie)
-        request = Request(
-            self.info_endpoint,
-            data=OPEN_PACK_BODY,
-            headers={
-                'Cookie': self.cookie,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0',
-                'Accept': '*/*',
-                'Accept-Language': 'en-GB,en;q=0.9',
-                'Referer': 'https://paninicollection.fifa.com/game/flash',
-                'X-User-Agent': 'Unity/1.3.0 (MacOS 10.15) Unity/6000.0.65f1 webgl_hires',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Origin': 'https://paninicollection.fifa.com',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Gpc': '1',
-                'Priority': 'u=4',
-            },
-            method='POST',
-        )
-
-        try:
-            with urlopen(request, timeout=self.request_timeout) as response:
-                return InfoResponse(text=response.read().decode('utf-8', errors='replace'))
-        except OSError as error:
-            raise click.ClickException(f'Request failed for info: {error}') from error
+        return self.panini_client.post_json(INFO_PATH, request_name='info')
 
     def print_response(self, response):
         if self.raw:

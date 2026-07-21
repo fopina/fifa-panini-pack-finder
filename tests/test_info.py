@@ -8,7 +8,6 @@ from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
 from fifa_panini.commands.info import Info, InfoResponse
-from fifa_panini.commands.open_pack import OPEN_PACK_BODY
 from fifa_panini.commands.panini import API_ENDPOINT
 
 
@@ -106,31 +105,22 @@ class InfoTestCase(unittest.TestCase):
         command = Info(dry_run=False, **panini_settings(cookie='session=value'))
 
         class FakeResponse:
-            def __enter__(self):
-                return self
+            headers = {}
+            text = '{"ok":true}'
 
-            def __exit__(self, _exc_type, _exc_value, _traceback):
-                return False
-
-            @staticmethod
-            def read():
-                return b'{"ok":true}'
-
-        def fake_urlopen(request, timeout):
-            captured['url'] = request.full_url
-            captured['method'] = request.get_method()
-            captured['data'] = request.data
-            captured['cookie'] = request.headers['Cookie']
-            captured['content_type'] = request.headers['Content-type']
+        def fake_post(_session, url, data, headers, timeout):
+            captured['url'] = url
+            captured['data'] = data
+            captured['cookie'] = headers['Cookie']
+            captured['content_type'] = headers['Content-Type']
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.info.urlopen', fake_urlopen):
+        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
             response = command.get_info()
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/init.json')
-        self.assertEqual(captured['method'], 'POST')
-        self.assertEqual(captured['data'], OPEN_PACK_BODY)
+        self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
         self.assertEqual(captured['cookie'], 'session=value')
         self.assertEqual(captured['content_type'], 'application/x-www-form-urlencoded')
         self.assertEqual(captured['timeout'], 30.0)

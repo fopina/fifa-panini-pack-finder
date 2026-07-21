@@ -1,15 +1,19 @@
-import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 import classyclick
 import click
 from tqdm import tqdm
 
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url, validate_cookie_header
+from .panini import (
+    DEFAULT_REQUEST_TIMEOUT,
+    PANINI_API_ENDPOINT_META_KEY,
+    PANINI_COOKIE_META_KEY,
+    Panini,
+    PaniniClient,
+    PaniniResponse,
+    validate_cookie_header,
+)
 
 DEFAULT_STATE_FILE = '.fifa-panini-try-code-state.json'
 DEFAULT_REQUEST_DELAY = 1.0
@@ -22,16 +26,17 @@ SUFFIX_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 TOTAL_SUFFIXES = len(SUFFIX_ALPHABET) ** 4
 
 
-@dataclass(frozen=True)
-class CodeResponse:
-    text: str
-    headers: dict[str, str]
+CodeResponse = PaniniResponse
 
 
 class CodeMethodsMixin:
     @property
     def unlock_pack_endpoint(self):
-        return api_url(self.api_endpoint, UNLOCK_PACK_PATH)
+        return self.panini_client.endpoint(UNLOCK_PACK_PATH)
+
+    @property
+    def panini_client(self):
+        return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
 
     def validate_code(self, code, option_name):
         if not CODE_PATTERN.fullmatch(code):
@@ -47,37 +52,7 @@ class CodeMethodsMixin:
         tqdm.write(response.text, end='' if response.text.endswith('\n') else '\n')
 
     def send_code(self, code):
-        validate_cookie_header(self.cookie)
-        payload = urlencode({'json': json.dumps({'code': code}, separators=(',', ':')), 'locale': 'en'}).encode()
-        request = Request(
-            self.unlock_pack_endpoint,
-            data=payload,
-            headers={
-                'Cookie': self.cookie,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0',
-                'Accept': '*/*',
-                'Accept-Language': 'en-GB,en;q=0.9',
-                'Referer': 'https://paninicollection.fifa.com/game/flash',
-                'X-User-Agent': 'Unity/1.3.0 (MacOS 10.15) Unity/6000.0.65f1 webgl_hires',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Origin': 'https://paninicollection.fifa.com',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Gpc': '1',
-                'Priority': 'u=4',
-            },
-            method='POST',
-        )
-
-        try:
-            with urlopen(request, timeout=self.request_timeout) as response:
-                return CodeResponse(
-                    text=response.read().decode('utf-8', errors='replace'),
-                    headers=dict(response.headers.items()),
-                )
-        except OSError as error:
-            raise click.ClickException(f'Request failed for {code}: {error}') from error
+        return self.panini_client.post_json(UNLOCK_PACK_PATH, {'code': code}, request_name=code)
 
     @property
     def state_path(self):
@@ -114,7 +89,7 @@ class TryCode(CodeMethodsMixin, Panini.Command):
     dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
-        default=30.0,
+        default=DEFAULT_REQUEST_TIMEOUT,
         show_default=True,
         help='HTTP request timeout in seconds.',
     )
