@@ -18,8 +18,7 @@ GOOD_CLAIM_RESPONSE_TEXT = (
     '"action":"challenge_summary"}]'
 )
 BAD_CLAIM_RESPONSE_TEXT = (
-    '[{"action":"receive_daily_packs"},'
-    '{"error":{"message":"no_packs"},"action":"receive_daily_packs"},'
+    '[{"error":{"message":"no_packs"},"action":"received_packs"},'
     '{"new_packs_in_sec":68705,"has_new_packs_waiting":false,"action":"daily_packs_status"},'
     '{"has_new_challenge":false,"has_just_completed_challenge":false,"num_available_challenges":1,'
     '"action":"challenge_summary"}]'

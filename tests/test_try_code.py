@@ -164,7 +164,7 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'Error: code.already_used\n')
+        self.assertEqual(result.output, 'Error: Response did not include received pack information.\n')
         self.assertNotIn('Response headers:', result.output)
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(BAD_TRY_CODE_RESPONSE_TEXT, result.output)
