@@ -6,4 +6,4 @@ from ..cli import CLI
 class Config(ConfigBaseCommand, CLI.Command):
     """Show or edit the current CLI configuration."""
 
-    MASKED_FIELDS = (*ConfigBaseCommand.MASKED_FIELDS, 'cookie')
+    MASKED_FIELDS = ('cookie',)
