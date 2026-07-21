@@ -102,6 +102,93 @@ class SwapTestCase(unittest.TestCase):
             ),
         )
 
+    def test_cli_delete_dry_run_posts_delete_payload(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                '--api-endpoint',
+                'https://example.test/api/',
+                'swap',
+                '--delete',
+                '1784671714343',
+                '--dry-run',
+            ],
+        )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            'DRY RUN POST https://example.test/api/delete_swap_request.json json={"id":"1784671714343"}\n',
+        )
+
+    def test_cli_create_dry_run_posts_create_payload(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                '--api-endpoint',
+                'https://example.test/api/',
+                'swap',
+                '--create',
+                '36',
+                '--dry-run',
+            ],
+        )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            (
+                'DRY RUN POST https://example.test/api/update_swap_request.json '
+                'json={"id":null,"only_team":true,"offer":{"stickers":[],"groups":[],"full_stack":true},'
+                '"demand":{"stickers":[36],"groups":[],"allow_duplicates":false}}\n'
+            ),
+        )
+
+    def test_cli_create_dry_run_can_allow_duplicates(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                '--api-endpoint',
+                'https://example.test/api/',
+                'swap',
+                '--create',
+                '36, 42',
+                '--create-allow-duplicates',
+                '--dry-run',
+            ],
+        )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            (
+                'DRY RUN POST https://example.test/api/update_swap_request.json '
+                'json={"id":null,"only_team":true,"offer":{"stickers":[],"groups":[],"full_stack":true},'
+                '"demand":{"stickers":[36,42],"groups":[],"allow_duplicates":true}}\n'
+            ),
+        )
+
     def test_sends_swap_request_with_info_body(self):
         captured = {}
         command = Swap(dry_run=False, **panini_settings(cookie='session=value'))
@@ -153,6 +240,67 @@ class SwapTestCase(unittest.TestCase):
         self.assertEqual(captured['content_type'], 'application/x-www-form-urlencoded')
         self.assertEqual(captured['timeout'], 30.0)
         self.assertEqual(response.text, '{"ok":true}')
+
+    def test_sends_delete_swap_request_with_id_body(self):
+        captured = {}
+        command = Swap(dry_run=False, **panini_settings(cookie='session=value'))
+
+        class FakeResponse:
+            headers = {}
+            text = '[{"action":"delete_swap_request"}]'
+
+        def fake_post(_session, url, data, headers, timeout):
+            captured['url'] = url
+            captured['data'] = data
+            captured['cookie'] = headers['Cookie']
+            captured['content_type'] = headers['Content-Type']
+            captured['timeout'] = timeout
+            return FakeResponse()
+
+        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
+            response = command.delete_swap_request('1784671714343')
+
+        self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/delete_swap_request.json')
+        self.assertEqual(captured['data'], {'json': '{"id":"1784671714343"}', 'locale': 'en'})
+        self.assertEqual(captured['cookie'], 'session=value')
+        self.assertEqual(captured['content_type'], 'application/x-www-form-urlencoded')
+        self.assertEqual(captured['timeout'], 30.0)
+        self.assertEqual(response.text, '[{"action":"delete_swap_request"}]')
+
+    def test_sends_create_swap_request_with_demand_body(self):
+        captured = {}
+        command = Swap(dry_run=False, create_allow_duplicates=True, **panini_settings(cookie='session=value'))
+
+        class FakeResponse:
+            headers = {}
+            text = '[{"action":"update_swap_request"}]'
+
+        def fake_post(_session, url, data, headers, timeout):
+            captured['url'] = url
+            captured['data'] = data
+            captured['cookie'] = headers['Cookie']
+            captured['content_type'] = headers['Content-Type']
+            captured['timeout'] = timeout
+            return FakeResponse()
+
+        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
+            response = command.create_swap_request([36, 42])
+
+        self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/update_swap_request.json')
+        self.assertEqual(
+            captured['data'],
+            {
+                'json': (
+                    '{"id":null,"only_team":true,"offer":{"stickers":[],"groups":[],"full_stack":true},'
+                    '"demand":{"stickers":[36,42],"groups":[],"allow_duplicates":true}}'
+                ),
+                'locale': 'en',
+            },
+        )
+        self.assertEqual(captured['cookie'], 'session=value')
+        self.assertEqual(captured['content_type'], 'application/x-www-form-urlencoded')
+        self.assertEqual(captured['timeout'], 30.0)
+        self.assertEqual(response.text, '[{"action":"update_swap_request"}]')
 
     def test_prints_swap_stack_stickers(self):
         config = self.write_config()
@@ -314,3 +462,206 @@ class SwapTestCase(unittest.TestCase):
 
         self.assertNotEqual(result.exit_code, 0)
         self.assertEqual(result.output, 'Error: Response did not include init sticker stacks.\n')
+
+    def test_delete_prints_success_for_confirmation_response(self):
+        config = self.write_config()
+        response = SwapResponse(
+            text=(
+                '[{"action":"delete_swap_request"},'
+                '{"has_new_challenge":true,"has_just_completed_challenge":false,'
+                '"num_available_challenges":1,"action":"challenge_summary"}]'
+            )
+        )
+
+        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: response):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--delete',
+                    '1784671714343',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Deleted swap request: 1784671714343\n')
+
+    def test_delete_rejects_error_in_delete_action(self):
+        config = self.write_config()
+        response = SwapResponse(text='[{"error":{"message":"swap_request.not_found"},"action":"delete_swap_request"}]')
+
+        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: response):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--delete',
+                    '1784671714343',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: swap_request.not_found\n')
+
+    def test_delete_rejects_missing_confirmation_response(self):
+        config = self.write_config()
+
+        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: SwapResponse(text='[]')):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--delete',
+                    '1784671714343',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: Response did not include delete_swap_request confirmation.\n')
+
+    def test_create_prints_success_for_confirmation_response(self):
+        config = self.write_config()
+        response = SwapResponse(
+            text=(
+                '[{"action":"update_swap_request"},'
+                '{"has_new_challenge":true,"has_just_completed_challenge":false,'
+                '"num_available_challenges":1,"action":"challenge_summary"}]'
+            )
+        )
+
+        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: response):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--create',
+                    '36, 42',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Created swap request for stickers: 36, 42\n')
+
+    def test_create_rejects_error_in_update_action(self):
+        config = self.write_config()
+        response = SwapResponse(text='[{"error":{"message":"swap_request.invalid"},"action":"update_swap_request"}]')
+
+        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: response):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--create',
+                    '36',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: swap_request.invalid\n')
+
+    def test_create_rejects_missing_confirmation_response(self):
+        config = self.write_config()
+
+        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: SwapResponse(text='[]')):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'swap',
+                    '--create',
+                    '36',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: Response did not include update_swap_request confirmation.\n')
+
+    def test_create_rejects_invalid_sticker_number(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                'swap',
+                '--create',
+                '36, nope',
+            ],
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: --create includes an invalid sticker number: nope\n')
+
+    def test_rejects_create_and_delete_together(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                'swap',
+                '--create',
+                '36',
+                '--delete',
+                '1784671714343',
+            ],
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: --delete and --create cannot be used together.\n')
+
+    def test_rejects_create_allow_duplicates_without_create(self):
+        config = self.write_config()
+
+        result = CliRunner().invoke(
+            CLI.click,
+            [
+                '--config',
+                str(config),
+                'panini',
+                '--cookie',
+                'session=value',
+                'swap',
+                '--create-allow-duplicates',
+            ],
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: --create-allow-duplicates can only be used with --create.\n')

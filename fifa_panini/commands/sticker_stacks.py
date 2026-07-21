@@ -38,6 +38,22 @@ def format_stickers(stickers):
     return ', '.join(str(sticker) for sticker in stickers)
 
 
+def parse_sticker_list(value, option_name):
+    if not value:
+        return []
+
+    stickers = []
+    for raw_sticker in value.split(','):
+        sticker = raw_sticker.strip()
+        if not sticker:
+            raise click.ClickException(f'{option_name} must be a comma-separated list of sticker numbers.')
+        try:
+            stickers.append(int(sticker))
+        except ValueError as error:
+            raise click.ClickException(f'{option_name} includes an invalid sticker number: {sticker}') from error
+    return stickers
+
+
 def action(actions, name):
     for action_item in actions:
         if isinstance(action_item, dict) and action_item.get('action') == name:

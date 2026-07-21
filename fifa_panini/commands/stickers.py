@@ -13,7 +13,7 @@ from .panini import (
     PaniniResponse,
     validate_cookie_header,
 )
-from .sticker_stacks import action, format_stickers, init_stacks, sticker_number, sticker_numbers
+from .sticker_stacks import action, format_stickers, init_stacks, parse_sticker_list, sticker_number, sticker_numbers
 
 StickersResponse = PaniniResponse
 MOVE_STICKERS_PATH = 'move_stickers.json'
@@ -162,23 +162,8 @@ class Stickers(Panini.Command):
             click.echo(f'Offer: {format_stickers(offer_stickers)}')
             click.echo(f'Ask: {format_stickers(ask_stickers)}')
 
-    @staticmethod
-    def parse_sticker_list(value, option_name):
-        if not value:
-            return []
-
-        stickers = []
-        for raw_sticker in value.split(','):
-            sticker = raw_sticker.strip()
-            if not sticker:
-                raise click.ClickException(f'{option_name} must be a comma-separated list of sticker numbers.')
-            try:
-                stickers.append(int(sticker))
-            except ValueError as error:
-                raise click.ClickException(f'{option_name} includes an invalid sticker number: {sticker}') from error
-        return stickers
-
     action = staticmethod(action)
+    parse_sticker_list = staticmethod(parse_sticker_list)
     sticker_number = staticmethod(sticker_number)
     sticker_numbers = staticmethod(sticker_numbers)
     format_stickers = staticmethod(format_stickers)
