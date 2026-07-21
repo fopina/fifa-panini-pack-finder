@@ -1,18 +1,16 @@
 import datetime as dt
-import json
 
 import classyclick
 import click
 
-from .panini import (
+from ..utils.actions import action, action_with_status, error_message, parse_action_list
+from ..utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
-    PANINI_API_ENDPOINT_META_KEY,
-    PANINI_COOKIE_META_KEY,
-    Panini,
     PaniniClient,
     PaniniResponse,
     validate_cookie_header,
 )
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 OPEN_PACK_PATH = 'open_pack.json'
 
@@ -39,18 +37,14 @@ class OpenPack(Panini.Command):
     def panini_client(self):
         return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
 
-    @property
-    def pack_endpoint(self):
-        return self.panini_client.endpoint(OPEN_PACK_PATH)
-
     def __call__(self):
         self.validate_settings()
 
         if self.dry_run:
-            click.echo(f'DRY RUN POST {self.pack_endpoint} json={{}}')
+            click.echo(f'DRY RUN POST {self.panini_client.endpoint(OPEN_PACK_PATH)} json={{}}')
             return
 
-        response = self.open_pack()
+        response = self.panini_client.post_json(OPEN_PACK_PATH, request_name='open pack')
         self.print_response(response)
 
     def validate_settings(self):
@@ -60,70 +54,38 @@ class OpenPack(Panini.Command):
             )
         validate_cookie_header(self.cookie)
 
-    def open_pack(self):
-        return self.panini_client.post_json(OPEN_PACK_PATH, request_name='open pack')
-
     def print_response(self, response):
-        try:
-            actions = json.loads(response.text)
-        except json.JSONDecodeError as error:
-            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+        actions = parse_action_list(response)
 
-        if not isinstance(actions, list):
-            raise click.ClickException('Response JSON must be an array of action objects.')
+        open_pack = action_with_status(actions, 'open_pack')
+        if not open_pack:
+            raise click.ClickException('Response did not include opened pack information.')
 
-        error_message = self.error_message(actions)
+        error_message = self.error_message(open_pack)
         if error_message:
             raise click.ClickException(error_message)
 
-        wait_message = self.wait_message(actions)
+        wait_message = self.wait_message(open_pack)
         if wait_message:
             raise click.ClickException(wait_message)
-
-        open_pack = self.action(actions, 'open_pack')
-        if not open_pack:
-            raise click.ClickException('Response did not include opened pack information.')
 
         stickers = open_pack.get('stickers') or []
         click.echo(f'Opened stickers: {", ".join(str(sticker) for sticker in stickers)}')
 
-    @staticmethod
-    def action(actions, name):
-        for action in actions:
-            if isinstance(action, dict) and action.get('action') == name:
-                return action
-        return {}
+    action = staticmethod(action)
+    error_message = staticmethod(error_message)
 
-    @staticmethod
-    def error_message(actions):
-        for action in actions:
-            if not isinstance(action, dict) or 'error' not in action:
-                continue
+    def wait_message(self, action_item):
+        wait = action_item.get('wait')
+        if wait is None:
+            return None
+        if not isinstance(wait, dict):
+            return str(wait)
 
-            error = action['error']
-            if isinstance(error, dict):
-                return error.get('message') or str(error)
-            return str(error)
-        return None
+        reason = wait.get('reason') or str(wait)
+        countdown_seconds = wait.get('countdown_seconds')
+        if countdown_seconds is None:
+            return reason
 
-    def wait_message(self, actions):
-        for action in actions:
-            if not isinstance(action, dict) or 'wait' not in action:
-                continue
-
-            wait = action['wait']
-            if not isinstance(wait, dict):
-                return str(wait)
-
-            reason = wait.get('reason') or str(wait)
-            countdown_seconds = wait.get('countdown_seconds')
-            if countdown_seconds is None:
-                return reason
-
-            available_at = self.current_time() + dt.timedelta(seconds=countdown_seconds)
-            return f'{reason} {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'
-        return None
-
-    @staticmethod
-    def current_time():
-        return dt.datetime.now().astimezone()
+        available_at = dt.datetime.now().astimezone() + dt.timedelta(seconds=countdown_seconds)
+        return f'{reason} {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'

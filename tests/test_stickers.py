@@ -7,8 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.panini import API_ENDPOINT
-from fifa_panini.commands.stickers import Stickers, StickersResponse
+from fifa_panini.commands.stickers import INFO_PATH, MOVE_STICKERS_PATH, Stickers, StickersResponse
+from fifa_panini.utils.panini import API_ENDPOINT
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -77,8 +77,8 @@ class StickersTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.get_stickers()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(INFO_PATH, request_name='stickers')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/init.json')
         self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
@@ -130,8 +130,12 @@ class StickersTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.move_stickers([44, 114, 143])
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(
+                MOVE_STICKERS_PATH,
+                payload={'from': 'temp', 'to': {'swap': [44, 114, 143]}},
+                request_name='move stickers',
+            )
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/move_stickers.json')
         self.assertEqual(captured['data'], {'json': '{"from":"temp","to":{"swap":[44,114,143]}}', 'locale': 'en'})
@@ -143,10 +147,9 @@ class StickersTestCase(unittest.TestCase):
     def test_move_skips_existing_stickers_output(self):
         config = self.write_config()
 
-        with patch.object(
-            Stickers,
-            'move_stickers',
-            lambda _self, _stickers: StickersResponse(text='[{"action":"move_stickers"}]'),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text='[{"action":"move_stickers"}]'),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -171,7 +174,7 @@ class StickersTestCase(unittest.TestCase):
         response = StickersResponse(
             text='[{"error":{"message":"move_stickers.temp_to_swap"},"action":"move_stickers"}]'
         )
-        with patch.object(Stickers, 'move_stickers', lambda _self, _stickers: response):
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: response):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -192,7 +195,10 @@ class StickersTestCase(unittest.TestCase):
     def test_move_rejects_missing_confirmation_response(self):
         config = self.write_config()
 
-        with patch.object(Stickers, 'move_stickers', lambda _self, _stickers: StickersResponse(text='[]')):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text='[]'),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -213,7 +219,10 @@ class StickersTestCase(unittest.TestCase):
     def test_prints_owned_duplicates_and_stickers_to_glue(self):
         config = self.write_config()
 
-        with patch.object(Stickers, 'get_stickers', lambda _self: StickersResponse(text=self.stickers_response_text())):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text=self.stickers_response_text()),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -243,7 +252,10 @@ class StickersTestCase(unittest.TestCase):
     def test_prints_trade_offer_and_ask_from_swap_flags(self):
         config = self.write_config()
 
-        with patch.object(Stickers, 'get_stickers', lambda _self: StickersResponse(text=self.stickers_response_text())):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text=self.stickers_response_text()),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -279,7 +291,10 @@ class StickersTestCase(unittest.TestCase):
     def test_rejects_invalid_swap_flag_sticker_number(self):
         config = self.write_config()
 
-        with patch.object(Stickers, 'get_stickers', lambda _self: StickersResponse(text=self.stickers_response_text())):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text=self.stickers_response_text()),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -320,7 +335,10 @@ class StickersTestCase(unittest.TestCase):
     def test_raises_click_exception_when_init_action_is_missing(self):
         config = self.write_config()
 
-        with patch.object(Stickers, 'get_stickers', lambda _self: StickersResponse(text='[]')):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(text='[]'),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [

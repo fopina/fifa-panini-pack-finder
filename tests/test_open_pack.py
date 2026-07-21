@@ -7,8 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.open_pack import OpenPack, PackResponse
-from fifa_panini.commands.panini import API_ENDPOINT
+from fifa_panini.commands.open_pack import OPEN_PACK_PATH, OpenPack, PackResponse
+from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_OPEN_PACK_RESPONSE_TEXT = (
     '[{"stickers":[194,513,705,1433,1441],"action":"open_pack"},'
@@ -27,6 +27,18 @@ WAIT_OPEN_PACK_RESPONSE_TEXT = (
     '"action":"challenge_summary"}]'
 )
 FIXED_TIME = dt.datetime(2026, 7, 21, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+
+class FixedNow:
+    @staticmethod
+    def astimezone():
+        return FIXED_TIME
+
+
+class FixedDateTime:
+    @staticmethod
+    def now():
+        return FixedNow()
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -86,8 +98,8 @@ class OpenPackTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.open_pack()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(OPEN_PACK_PATH, request_name='open pack')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/open_pack.json')
         self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
@@ -99,10 +111,12 @@ class OpenPackTestCase(unittest.TestCase):
     def test_prints_opened_pack_summary_for_success_response(self):
         config = self.write_config()
 
-        with patch.object(
-            OpenPack,
-            'open_pack',
-            lambda _self: PackResponse(text=GOOD_OPEN_PACK_RESPONSE_TEXT, headers={'Content-Type': 'application/json'}),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: PackResponse(
+                text=GOOD_OPEN_PACK_RESPONSE_TEXT,
+                headers={'Content-Type': 'application/json'},
+            ),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -125,13 +139,45 @@ class OpenPackTestCase(unittest.TestCase):
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(GOOD_OPEN_PACK_RESPONSE_TEXT, result.output)
 
+    def test_ignores_error_and_wait_from_unrelated_actions(self):
+        config = self.write_config()
+        response_text = (
+            '[{"stickers":[194,513],"action":"open_pack"},'
+            '{"error":{"message":"challenge.failed"},"action":"challenge_summary"},'
+            '{"wait":{"reason":"retry later"},"action":"daily_packs_status"}]'
+        )
+
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: PackResponse(
+                text=response_text,
+                headers={'Content-Type': 'application/json'},
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'open',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Opened stickers: 194, 513\n')
+
     def test_raises_click_exception_for_error_response(self):
         config = self.write_config()
 
-        with patch.object(
-            OpenPack,
-            'open_pack',
-            lambda _self: PackResponse(text=BAD_OPEN_PACK_RESPONSE_TEXT, headers={'Content-Type': 'application/json'}),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: PackResponse(
+                text=BAD_OPEN_PACK_RESPONSE_TEXT,
+                headers={'Content-Type': 'application/json'},
+            ),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -155,15 +201,14 @@ class OpenPackTestCase(unittest.TestCase):
         config = self.write_config()
 
         with (
-            patch.object(
-                OpenPack,
-                'open_pack',
-                lambda _self: PackResponse(
+            patch(
+                'fifa_panini.utils.panini.PaniniClient.post_json',
+                lambda _self, *_args, **_kwargs: PackResponse(
                     text=WAIT_OPEN_PACK_RESPONSE_TEXT,
                     headers={'Content-Type': 'application/json'},
                 ),
             ),
-            patch.object(OpenPack, 'current_time', staticmethod(lambda: FIXED_TIME)),
+            patch('fifa_panini.commands.open_pack.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,

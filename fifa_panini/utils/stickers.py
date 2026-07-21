@@ -1,16 +1,10 @@
-import json
-
 import click
+
+from .actions import action, parse_action_list
 
 
 def init_stacks(response):
-    try:
-        actions = json.loads(response.text)
-    except json.JSONDecodeError as error:
-        raise click.ClickException(f'Response was not valid JSON: {error}') from error
-
-    if not isinstance(actions, list):
-        raise click.ClickException('Response JSON must be an array of action objects.')
+    actions = parse_action_list(response)
 
     init = action(actions, 'init')
     stacks = init.get('stacks') or {}
@@ -52,10 +46,3 @@ def parse_sticker_list(value, option_name):
         except ValueError as error:
             raise click.ClickException(f'{option_name} includes an invalid sticker number: {sticker}') from error
     return stickers
-
-
-def action(actions, name):
-    for action_item in actions:
-        if isinstance(action_item, dict) and action_item.get('action') == name:
-            return action_item
-    return {}

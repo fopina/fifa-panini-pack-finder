@@ -6,8 +6,9 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.panini import API_ENDPOINT
-from fifa_panini.commands.try_code import CodeResponse, TryCode
+from fifa_panini.commands.try_code import TryCode
+from fifa_panini.utils.codes import CodeResponse
+from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_TRY_CODE_RESPONSE_TEXT = (
     '[{"code":"SDB9-LM7T-93YT","is_multi_code":false,"market":"cr","action":"unlock_pack"},'
@@ -106,6 +107,38 @@ class TryCodeTestCase(unittest.TestCase):
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(GOOD_TRY_CODE_RESPONSE_TEXT, result.output)
 
+    def test_ignores_error_from_unrelated_action(self):
+        config = self.write_config()
+        response_text = (
+            '[{"code":"SDB9-LM7T-93YT","action":"unlock_pack"},'
+            '{"amount":1,"total_packs":2,"action":"received_packs"},'
+            '{"error":{"message":"challenge.failed"},"action":"challenge_summary"}]'
+        )
+
+        with patch.object(
+            TryCode,
+            'send_code',
+            lambda _self, _code: CodeResponse(
+                text=response_text,
+                headers={'Content-Type': 'application/json'},
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'try-code',
+                    'ABCD-EFGH-IJKL',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Won 1 packs. Total packs: 2\n')
+
     def test_raises_click_exception_for_error_response(self):
         config = self.write_config()
 
@@ -131,7 +164,7 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'Error: code.already_used\n')
+        self.assertEqual(result.output, 'Error: Response did not include received pack information.\n')
         self.assertNotIn('Response headers:', result.output)
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(BAD_TRY_CODE_RESPONSE_TEXT, result.output)
@@ -207,7 +240,7 @@ class TryCodeTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
             response = command.send_code('ABCD-EFGH-IJKL')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/unlock_pack.json')

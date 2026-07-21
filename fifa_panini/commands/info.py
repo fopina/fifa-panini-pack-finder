@@ -1,17 +1,14 @@
-import json
-
 import classyclick
 import click
 
-from .panini import (
+from ..utils.actions import action, parse_action_list
+from ..utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
-    PANINI_API_ENDPOINT_META_KEY,
-    PANINI_COOKIE_META_KEY,
-    Panini,
     PaniniClient,
     PaniniResponse,
     validate_cookie_header,
 )
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 InfoResponse = PaniniResponse
 INFO_PATH = 'init.json'
@@ -35,18 +32,14 @@ class Info(Panini.Command):
     def panini_client(self):
         return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
 
-    @property
-    def info_endpoint(self):
-        return self.panini_client.endpoint(INFO_PATH)
-
     def __call__(self):
         self.validate_settings()
 
         if self.dry_run:
-            click.echo(f'DRY RUN POST {self.info_endpoint} json={{}}')
+            click.echo(f'DRY RUN POST {self.panini_client.endpoint(INFO_PATH)} json={{}}')
             return
 
-        response = self.get_info()
+        response = self.panini_client.post_json(INFO_PATH, request_name='info')
         self.print_response(response)
 
     def validate_settings(self):
@@ -56,23 +49,12 @@ class Info(Panini.Command):
             )
         validate_cookie_header(self.cookie)
 
-    def get_info(self):
-        return self.panini_client.post_json(INFO_PATH, request_name='info')
-
     def print_response(self, response):
         if self.raw:
             click.echo(response.text, nl=not response.text.endswith('\n'))
             return
 
-        try:
-            actions = json.loads(response.text)
-        except json.JSONDecodeError as error:
-            raise click.ClickException(f'Response was not valid JSON: {error}') from error
-
-        if not isinstance(actions, list):
-            raise click.ClickException('Response JSON must be an array of action objects.')
-
-        self.print_summary(actions)
+        self.print_summary(parse_action_list(response))
 
     def print_summary(self, actions):
         received_packs = self.action(actions, 'received_packs')
@@ -103,20 +85,11 @@ class Info(Panini.Command):
             )
 
         if init:
-            click.echo(f'Album completed: {self.yes_no(init.get("album_completed"))}')
+            click.echo(f'Album completed: {"yes" if init.get("album_completed") else "no"}')
             stacks = init.get('stacks') or {}
             for name in sorted(stacks):
                 click.echo(f'{name} stickers: {len(stacks[name])}')
             click.echo(f'Completed groups: {len(init.get("completed_groups") or [])}')
             click.echo(f'Received swaps: {len(init.get("received_swaps") or [])}')
 
-    @staticmethod
-    def action(actions, name):
-        for action in actions:
-            if isinstance(action, dict) and action.get('action') == name:
-                return action
-        return {}
-
-    @staticmethod
-    def yes_no(value):
-        return 'yes' if value else 'no'
+    action = staticmethod(action)

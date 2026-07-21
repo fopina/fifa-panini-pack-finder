@@ -7,7 +7,7 @@ from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
 from fifa_panini.commands.daily_play import DEFAULT_DAILY_PLAY_ENDPOINT, DailyPlay
-from fifa_panini.commands.try_code import CodeResponse
+from fifa_panini.utils.codes import CodeResponse
 
 GOOD_DAILY_PLAY_RESPONSE_TEXT = (
     '{"success":{"paniniCode":{"code":"2CVJ-81ZE-91MT",'

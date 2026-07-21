@@ -7,8 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.info import Info, InfoResponse
-from fifa_panini.commands.panini import API_ENDPOINT
+from fifa_panini.commands.info import INFO_PATH, Info, InfoResponse
+from fifa_panini.utils.panini import API_ENDPOINT
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -116,8 +116,8 @@ class InfoTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.get_info()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(INFO_PATH, request_name='info')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/init.json')
         self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
@@ -129,7 +129,10 @@ class InfoTestCase(unittest.TestCase):
     def test_prints_info_summary_by_default(self):
         config = self.write_config()
 
-        with patch.object(Info, 'get_info', lambda _self: InfoResponse(text=self.info_response_text())):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: InfoResponse(text=self.info_response_text()),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -172,7 +175,10 @@ class InfoTestCase(unittest.TestCase):
         config = self.write_config()
         response_text = self.info_response_text()
 
-        with patch.object(Info, 'get_info', lambda _self: InfoResponse(text=response_text)):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: InfoResponse(text=response_text),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
