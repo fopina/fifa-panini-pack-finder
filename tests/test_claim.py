@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.claim import CLAIM_PACKS_BODY, Claim
+from fifa_panini.commands.claim import Claim
 from fifa_panini.commands.panini import API_ENDPOINT
 
 GOOD_CLAIM_RESPONSE_TEXT = (
@@ -48,22 +48,14 @@ class ClaimTestCase(unittest.TestCase):
 
         class FakeResponse:
             headers = {'Content-Type': 'application/json'}
+            text = GOOD_CLAIM_RESPONSE_TEXT
 
-            def __enter__(self):
-                return self
-
-            def __exit__(self, _exc_type, _exc_value, _traceback):
-                return False
-
-            def read(self):
-                return GOOD_CLAIM_RESPONSE_TEXT.encode()
-
-        def fake_urlopen(request, timeout):
-            requests.append((request, timeout))
+        def fake_post(_session, url, data, headers, timeout):
+            requests.append((url, data, headers, timeout))
             return FakeResponse()
 
         with (
-            patch('fifa_panini.commands.claim.urlopen', fake_urlopen),
+            patch('fifa_panini.commands.panini.requests.Session.post', fake_post),
             patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
         ):
             result = CliRunner().invoke(
@@ -83,12 +75,11 @@ class ClaimTestCase(unittest.TestCase):
             result.output,
             'Claimed packs: 2\nTotal packs: 52\nNew packs available at: 2026-07-22 07:06:19 UTC\n',
         )
-        request, timeout = requests[0]
-        self.assertEqual(request.full_url, 'https://paninicollection.fifa.com/api/receive_daily_packs.json')
-        self.assertEqual(request.get_method(), 'POST')
-        self.assertEqual(request.data, CLAIM_PACKS_BODY)
-        self.assertEqual(request.get_header('Cookie'), 'session=value')
-        self.assertEqual(request.get_header('Content-type'), 'application/x-www-form-urlencoded')
+        url, data, headers, timeout = requests[0]
+        self.assertEqual(url, 'https://paninicollection.fifa.com/api/receive_daily_packs.json')
+        self.assertEqual(data, {'json': '{}', 'locale': 'en'})
+        self.assertEqual(headers['Cookie'], 'session=value')
+        self.assertEqual(headers['Content-Type'], 'application/x-www-form-urlencoded')
         self.assertEqual(timeout, 30.0)
 
     def test_dry_run_prints_request(self):
@@ -121,28 +112,20 @@ class ClaimTestCase(unittest.TestCase):
 
         class FakeResponse:
             headers = {'Content-Type': 'application/json'}
+            text = GOOD_CLAIM_RESPONSE_TEXT
 
-            def __enter__(self):
-                return self
-
-            def __exit__(self, _exc_type, _exc_value, _traceback):
-                return False
-
-            def read(self):
-                return GOOD_CLAIM_RESPONSE_TEXT.encode()
-
-        def fake_urlopen(request, timeout):
-            requests.append((request, timeout))
+        def fake_post(_session, url, data, headers, timeout):
+            requests.append((url, data, headers, timeout))
             return FakeResponse()
 
         with (
-            patch('fifa_panini.commands.claim.urlopen', fake_urlopen),
+            patch('fifa_panini.commands.panini.requests.Session.post', fake_post),
             patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
         ):
             result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'claim'])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(requests[0][0].get_header('Cookie'), 'session=value')
+        self.assertEqual(requests[0][2]['Cookie'], 'session=value')
 
     def test_prints_claim_summary_for_success_response(self):
         config = self.write_config()
@@ -230,27 +213,19 @@ class ClaimTestCase(unittest.TestCase):
 
         class FakeResponse:
             headers = {'Content-Type': 'application/json'}
+            text = '{"claimed":true}'
 
-            def __enter__(self):
-                return self
-
-            def __exit__(self, _exc_type, _exc_value, _traceback):
-                return False
-
-            def read(self):
-                return b'{"claimed":true}'
-
-        def fake_urlopen(request, timeout):
-            requests.append((request, timeout))
+        def fake_post(_session, url, data, headers, timeout):
+            requests.append((url, data, headers, timeout))
             return FakeResponse()
 
-        with patch('fifa_panini.commands.claim.urlopen', fake_urlopen):
+        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
             response = command.claim_packs()
 
         self.assertEqual(response.text, '{"claimed":true}')
         self.assertEqual(response.headers, {'Content-Type': 'application/json'})
-        self.assertEqual(requests[0][0].full_url, 'https://paninicollection.fifa.com/api/receive_daily_packs.json')
-        self.assertEqual(requests[0][0].data, b'json=%7b%7d&locale=en')
+        self.assertEqual(requests[0][0], 'https://paninicollection.fifa.com/api/receive_daily_packs.json')
+        self.assertEqual(requests[0][1], {'json': '{}', 'locale': 'en'})
 
 
 class ClaimResponseStub:

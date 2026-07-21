@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "classyclick>=1.0.3",
+    "requests>=2.33.0",
     "tqdm>=4.67.1",
 ]
 

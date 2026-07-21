@@ -1,20 +1,23 @@
 import datetime as dt
 import json
-from dataclasses import dataclass
-from urllib.request import Request, urlopen
 
 import classyclick
 import click
 
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini, api_url, validate_cookie_header
+from .panini import (
+    DEFAULT_REQUEST_TIMEOUT,
+    PANINI_API_ENDPOINT_META_KEY,
+    PANINI_COOKIE_META_KEY,
+    Panini,
+    PaniniClient,
+    PaniniResponse,
+    validate_cookie_header,
+)
 
-OPEN_PACK_BODY = b'json=%7b%7d&locale=en'
+OPEN_PACK_PATH = 'open_pack.json'
 
 
-@dataclass(frozen=True)
-class PackResponse:
-    text: str
-    headers: dict[str, str]
+PackResponse = PaniniResponse
 
 
 class OpenPack(Panini.Command):
@@ -27,14 +30,18 @@ class OpenPack(Panini.Command):
     dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
-        default=30.0,
+        default=DEFAULT_REQUEST_TIMEOUT,
         show_default=True,
         help='HTTP request timeout in seconds.',
     )
 
     @property
+    def panini_client(self):
+        return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
+
+    @property
     def pack_endpoint(self):
-        return api_url(self.api_endpoint, 'open_pack.json')
+        return self.panini_client.endpoint(OPEN_PACK_PATH)
 
     def __call__(self):
         self.validate_settings()
@@ -54,36 +61,7 @@ class OpenPack(Panini.Command):
         validate_cookie_header(self.cookie)
 
     def open_pack(self):
-        validate_cookie_header(self.cookie)
-        request = Request(
-            self.pack_endpoint,
-            data=OPEN_PACK_BODY,
-            headers={
-                'Cookie': self.cookie,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0',
-                'Accept': '*/*',
-                'Accept-Language': 'en-GB,en;q=0.9',
-                'Referer': 'https://paninicollection.fifa.com/game/flash',
-                'X-User-Agent': 'Unity/1.3.0 (MacOS 10.15) Unity/6000.0.65f1 webgl_hires',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Origin': 'https://paninicollection.fifa.com',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Gpc': '1',
-                'Priority': 'u=4',
-            },
-            method='POST',
-        )
-
-        try:
-            with urlopen(request, timeout=self.request_timeout) as response:
-                return PackResponse(
-                    text=response.read().decode('utf-8', errors='replace'),
-                    headers=dict(response.headers.items()),
-                )
-        except OSError as error:
-            raise click.ClickException(f'Request failed for open pack: {error}') from error
+        return self.panini_client.post_json(OPEN_PACK_PATH, request_name='open pack')
 
     def print_response(self, response):
         try:
