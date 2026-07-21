@@ -6,8 +6,7 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
-from .try_code import (
+from ..utils.codes import (
     CODE_ALREADY_USED_MARKER,
     DEFAULT_REQUEST_DELAY,
     DEFAULT_STATE_FILE,
@@ -15,8 +14,12 @@ from .try_code import (
     SUFFIX_ALPHABET,
     TOTAL_SUFFIXES,
     CodeMethodsMixin,
+)
+from ..utils.panini import (
+    DEFAULT_REQUEST_TIMEOUT,
     validate_cookie_header,
 )
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 
 class BfCode(CodeMethodsMixin, Panini.Command):
@@ -36,7 +39,7 @@ class BfCode(CodeMethodsMixin, Panini.Command):
     dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
-        default=30.0,
+        default=DEFAULT_REQUEST_TIMEOUT,
         show_default=True,
         help='HTTP request timeout in seconds.',
     )

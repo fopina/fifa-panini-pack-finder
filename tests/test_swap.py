@@ -7,12 +7,28 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.panini import API_ENDPOINT
-from fifa_panini.commands.swap import Swap, SwapResponse
+from fifa_panini.commands.swap import (
+    DELETE_SWAP_REQUEST_PATH,
+    INFO_PATH,
+    SWAP_REQUESTS_PATH,
+    UPDATE_SWAP_REQUEST_PATH,
+    Swap,
+    SwapResponse,
+)
+from fifa_panini.utils.panini import API_ENDPOINT
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
     return {'cookie': cookie, 'api_endpoint': api_endpoint}
+
+
+def post_json_responses(*responses):
+    responses = list(responses)
+
+    def fake_post_json(_self, *_args, **_kwargs):
+        return responses.pop(0)
+
+    return fake_post_json
 
 
 class SwapTestCase(unittest.TestCase):
@@ -205,8 +221,8 @@ class SwapTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.get_swap()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(INFO_PATH, request_name='swap')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/init.json')
         self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
@@ -231,8 +247,8 @@ class SwapTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.get_swap_requests()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(SWAP_REQUESTS_PATH, request_name='swap requests')
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/swap_requests.json')
         self.assertEqual(captured['data'], {'json': '{}', 'locale': 'en'})
@@ -257,8 +273,12 @@ class SwapTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.delete_swap_request('1784671714343')
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(
+                DELETE_SWAP_REQUEST_PATH,
+                payload={'id': '1784671714343'},
+                request_name='delete swap request',
+            )
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/delete_swap_request.json')
         self.assertEqual(captured['data'], {'json': '{"id":"1784671714343"}', 'locale': 'en'})
@@ -283,8 +303,25 @@ class SwapTestCase(unittest.TestCase):
             captured['timeout'] = timeout
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.create_swap_request([36, 42])
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(
+                UPDATE_SWAP_REQUEST_PATH,
+                payload={
+                    'id': None,
+                    'only_team': True,
+                    'offer': {
+                        'stickers': [],
+                        'groups': [],
+                        'full_stack': True,
+                    },
+                    'demand': {
+                        'stickers': [36, 42],
+                        'groups': [],
+                        'allow_duplicates': command.create_allow_duplicates,
+                    },
+                },
+                request_name='create swap request',
+            )
 
         self.assertEqual(captured['url'], 'https://paninicollection.fifa.com/api/update_swap_request.json')
         self.assertEqual(
@@ -305,12 +342,11 @@ class SwapTestCase(unittest.TestCase):
     def test_prints_swap_stack_stickers(self):
         config = self.write_config()
 
-        with (
-            patch.object(Swap, 'get_swap_stack', lambda _self: SwapResponse(text=self.swap_response_text())),
-            patch.object(
-                Swap,
-                'get_swap_requests',
-                lambda _self: SwapResponse(text=self.swap_requests_response_text([])),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            post_json_responses(
+                SwapResponse(text=self.swap_response_text()),
+                SwapResponse(text=self.swap_requests_response_text([])),
             ),
         ):
             result = CliRunner().invoke(
@@ -331,12 +367,11 @@ class SwapTestCase(unittest.TestCase):
     def test_prints_swap_requests(self):
         config = self.write_config()
 
-        with (
-            patch.object(Swap, 'get_swap_stack', lambda _self: SwapResponse(text=self.swap_response_text())),
-            patch.object(
-                Swap,
-                'get_swap_requests',
-                lambda _self: SwapResponse(text=self.swap_requests_response_text()),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            post_json_responses(
+                SwapResponse(text=self.swap_response_text()),
+                SwapResponse(text=self.swap_requests_response_text()),
             ),
         ):
             result = CliRunner().invoke(
@@ -378,12 +413,11 @@ class SwapTestCase(unittest.TestCase):
             }
         ]
 
-        with (
-            patch.object(Swap, 'get_swap_stack', lambda _self: SwapResponse(text=self.swap_response_text())),
-            patch.object(
-                Swap,
-                'get_swap_requests',
-                lambda _self: SwapResponse(text=self.swap_requests_response_text(requests)),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            post_json_responses(
+                SwapResponse(text=self.swap_response_text()),
+                SwapResponse(text=self.swap_requests_response_text(requests)),
             ),
         ):
             result = CliRunner().invoke(
@@ -414,12 +448,11 @@ class SwapTestCase(unittest.TestCase):
     def test_prints_none_when_swap_stack_is_empty(self):
         config = self.write_config()
 
-        with (
-            patch.object(Swap, 'get_swap_stack', lambda _self: SwapResponse(text=self.swap_response_text([]))),
-            patch.object(
-                Swap,
-                'get_swap_requests',
-                lambda _self: SwapResponse(text=self.swap_requests_response_text([])),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            post_json_responses(
+                SwapResponse(text=self.swap_response_text([])),
+                SwapResponse(text=self.swap_requests_response_text([])),
             ),
         ):
             result = CliRunner().invoke(
@@ -440,12 +473,11 @@ class SwapTestCase(unittest.TestCase):
     def test_raises_click_exception_when_init_action_is_missing(self):
         config = self.write_config()
 
-        with (
-            patch.object(Swap, 'get_swap_stack', lambda _self: SwapResponse(text='[]')),
-            patch.object(
-                Swap,
-                'get_swap_requests',
-                lambda _self: SwapResponse(text=self.swap_requests_response_text([])),
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            post_json_responses(
+                SwapResponse(text='[]'),
+                SwapResponse(text=self.swap_requests_response_text([])),
             ),
         ):
             result = CliRunner().invoke(
@@ -473,7 +505,7 @@ class SwapTestCase(unittest.TestCase):
             )
         )
 
-        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: response):
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: response):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -495,7 +527,7 @@ class SwapTestCase(unittest.TestCase):
         config = self.write_config()
         response = SwapResponse(text='[{"error":{"message":"swap_request.not_found"},"action":"delete_swap_request"}]')
 
-        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: response):
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: response):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -516,7 +548,10 @@ class SwapTestCase(unittest.TestCase):
     def test_delete_rejects_missing_confirmation_response(self):
         config = self.write_config()
 
-        with patch.object(Swap, 'delete_swap_request', lambda _self, _request_id: SwapResponse(text='[]')):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: SwapResponse(text='[]'),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -544,7 +579,7 @@ class SwapTestCase(unittest.TestCase):
             )
         )
 
-        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: response):
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: response):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -566,7 +601,7 @@ class SwapTestCase(unittest.TestCase):
         config = self.write_config()
         response = SwapResponse(text='[{"error":{"message":"swap_request.invalid"},"action":"update_swap_request"}]')
 
-        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: response):
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: response):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -587,7 +622,10 @@ class SwapTestCase(unittest.TestCase):
     def test_create_rejects_missing_confirmation_response(self):
         config = self.write_config()
 
-        with patch.object(Swap, 'create_swap_request', lambda _self, _stickers: SwapResponse(text='[]')):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: SwapResponse(text='[]'),
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [

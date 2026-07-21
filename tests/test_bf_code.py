@@ -8,8 +8,8 @@ from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
 from fifa_panini.commands.bf_code import BfCode
-from fifa_panini.commands.panini import API_ENDPOINT
-from fifa_panini.commands.try_code import DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse
+from fifa_panini.utils.codes import DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse
+from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_TRY_CODE_RESPONSE_TEXT = (
     '[{"code":"SDB9-LM7T-93YT","is_multi_code":false,"market":"cr","action":"unlock_pack"},'

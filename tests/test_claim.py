@@ -7,8 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.claim import Claim
-from fifa_panini.commands.panini import API_ENDPOINT
+from fifa_panini.commands.claim import CLAIM_PACKS_PATH, Claim
+from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_CLAIM_RESPONSE_TEXT = (
     '[{"action":"receive_daily_packs"},'
@@ -25,6 +25,18 @@ BAD_CLAIM_RESPONSE_TEXT = (
     '"action":"challenge_summary"}]'
 )
 FIXED_TIME = dt.datetime(2026, 7, 21, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+
+class FixedNow:
+    @staticmethod
+    def astimezone():
+        return FIXED_TIME
+
+
+class FixedDateTime:
+    @staticmethod
+    def now():
+        return FixedNow()
 
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
@@ -55,8 +67,8 @@ class ClaimTestCase(unittest.TestCase):
             return FakeResponse()
 
         with (
-            patch('fifa_panini.commands.panini.requests.Session.post', fake_post),
-            patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
+            patch('fifa_panini.utils.panini.requests.Session.post', fake_post),
+            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -119,8 +131,8 @@ class ClaimTestCase(unittest.TestCase):
             return FakeResponse()
 
         with (
-            patch('fifa_panini.commands.panini.requests.Session.post', fake_post),
-            patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
+            patch('fifa_panini.utils.panini.requests.Session.post', fake_post),
+            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'claim'])
 
@@ -131,8 +143,11 @@ class ClaimTestCase(unittest.TestCase):
         config = self.write_config()
 
         with (
-            patch.object(Claim, 'claim_packs', lambda _self: ClaimResponseStub(GOOD_CLAIM_RESPONSE_TEXT)),
-            patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
+            patch(
+                'fifa_panini.utils.panini.PaniniClient.post_json',
+                lambda _self, *_args, **_kwargs: ClaimResponseStub(GOOD_CLAIM_RESPONSE_TEXT),
+            ),
+            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -155,12 +170,49 @@ class ClaimTestCase(unittest.TestCase):
         self.assertNotIn('Response text:', result.output)
         self.assertNotIn(GOOD_CLAIM_RESPONSE_TEXT, result.output)
 
+    def test_ignores_error_from_unrelated_action(self):
+        config = self.write_config()
+        response_text = (
+            '[{"action":"receive_daily_packs"},'
+            '{"amount":2,"total_packs":52,"action":"received_packs"},'
+            '{"new_packs_in_sec":68779,"action":"daily_packs_status"},'
+            '{"error":{"message":"challenge.failed"},"action":"challenge_summary"}]'
+        )
+
+        with (
+            patch(
+                'fifa_panini.utils.panini.PaniniClient.post_json',
+                lambda _self, *_args, **_kwargs: ClaimResponseStub(response_text),
+            ),
+            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'claim',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            'Claimed packs: 2\nTotal packs: 52\nNew packs available at: 2026-07-22 07:06:19 UTC\n',
+        )
+
     def test_raises_click_exception_for_error_response(self):
         config = self.write_config()
 
         with (
-            patch.object(Claim, 'claim_packs', lambda _self: ClaimResponseStub(BAD_CLAIM_RESPONSE_TEXT)),
-            patch.object(Claim, 'current_time', staticmethod(lambda: FIXED_TIME)),
+            patch(
+                'fifa_panini.utils.panini.PaniniClient.post_json',
+                lambda _self, *_args, **_kwargs: ClaimResponseStub(BAD_CLAIM_RESPONSE_TEXT),
+            ),
+            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -219,8 +271,8 @@ class ClaimTestCase(unittest.TestCase):
             requests.append((url, data, headers, timeout))
             return FakeResponse()
 
-        with patch('fifa_panini.commands.panini.requests.Session.post', fake_post):
-            response = command.claim_packs()
+        with patch('fifa_panini.utils.panini.requests.Session.post', fake_post):
+            response = command.panini_client.post_json(CLAIM_PACKS_PATH, request_name='claim packs')
 
         self.assertEqual(response.text, '{"claimed":true}')
         self.assertEqual(response.headers, {'Content-Type': 'application/json'})

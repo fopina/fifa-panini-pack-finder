@@ -1,17 +1,15 @@
 import datetime as dt
-import json
 
 import classyclick
 import click
 
-from .panini import (
+from ..utils.actions import action, error_message, parse_action_list
+from ..utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
-    PANINI_API_ENDPOINT_META_KEY,
-    PANINI_COOKIE_META_KEY,
-    Panini,
     PaniniClient,
     validate_cookie_header,
 )
+from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 CLAIM_PACKS_PATH = 'receive_daily_packs.json'
 
@@ -33,18 +31,14 @@ class Claim(Panini.Command):
     def panini_client(self):
         return PaniniClient(self.cookie, self.api_endpoint, self.request_timeout)
 
-    @property
-    def claim_endpoint(self):
-        return self.panini_client.endpoint(CLAIM_PACKS_PATH)
-
     def __call__(self):
         self.validate_settings()
 
         if self.dry_run:
-            click.echo(f'DRY RUN POST {self.claim_endpoint} json={{}}')
+            click.echo(f'DRY RUN POST {self.panini_client.endpoint(CLAIM_PACKS_PATH)} json={{}}')
             return
 
-        response = self.claim_packs()
+        response = self.panini_client.post_json(CLAIM_PACKS_PATH, request_name='claim packs')
         self.print_response(response)
 
     def validate_settings(self):
@@ -54,29 +48,20 @@ class Claim(Panini.Command):
             )
         validate_cookie_header(self.cookie)
 
-    def claim_packs(self):
-        return self.panini_client.post_json(CLAIM_PACKS_PATH, request_name='claim packs')
-
     def print_response(self, response):
-        try:
-            actions = json.loads(response.text)
-        except json.JSONDecodeError as error:
-            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+        actions = parse_action_list(response)
 
-        if not isinstance(actions, list):
-            raise click.ClickException('Response JSON must be an array of action objects.')
+        received_packs = self.action(actions, 'received_packs')
+        if not received_packs:
+            raise click.ClickException('Response did not include received pack information.')
 
         next_packs_message = self.next_packs_message(actions)
-        error_message = self.error_message(actions)
+        error_message = self.error_message(received_packs)
         if error_message:
             message = error_message
             if next_packs_message:
                 message = f'{message}. {next_packs_message}'
             raise click.ClickException(message)
-
-        received_packs = self.action(actions, 'received_packs')
-        if not received_packs:
-            raise click.ClickException('Response did not include received pack information.')
 
         click.echo(f'Claimed packs: {received_packs.get("amount", 0)}')
         click.echo(f'Total packs: {received_packs.get("total_packs", 0)}')
@@ -89,28 +74,8 @@ class Claim(Panini.Command):
         if new_packs_in_sec is None:
             return None
 
-        available_at = self.current_time() + dt.timedelta(seconds=new_packs_in_sec)
+        available_at = dt.datetime.now().astimezone() + dt.timedelta(seconds=new_packs_in_sec)
         return f'New packs available at: {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'
 
-    @staticmethod
-    def current_time():
-        return dt.datetime.now().astimezone()
-
-    @staticmethod
-    def action(actions, name):
-        for action in actions:
-            if isinstance(action, dict) and action.get('action') == name:
-                return action
-        return {}
-
-    @staticmethod
-    def error_message(actions):
-        for action in actions:
-            if not isinstance(action, dict) or 'error' not in action:
-                continue
-
-            error = action['error']
-            if isinstance(error, dict):
-                return error.get('message') or str(error)
-            return str(error)
-        return None
+    action = staticmethod(action)
+    error_message = staticmethod(error_message)
