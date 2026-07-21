@@ -1,3 +1,4 @@
+import json
 from urllib.request import Request, urlopen
 
 import classyclick
@@ -34,11 +35,52 @@ class DailyPlay(CLI.Command):
         validate_cookie_header(self.cookie)
 
     def print_response(self, response):
-        click.echo('Response headers:')
-        for name, value in response.headers.items():
-            click.echo(f'{name}: {value}')
-        click.echo('Response text:')
-        click.echo(response.text, nl=not response.text.endswith('\n'))
+        try:
+            payload = json.loads(response.text)
+        except json.JSONDecodeError as error:
+            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+
+        if not isinstance(payload, dict):
+            raise click.ClickException('Response JSON must be an object.')
+
+        errors = payload.get('errors')
+        if errors:
+            raise click.ClickException(f'Response errors: {self.format_errors(errors)}')
+
+        code = self.daily_code(payload)
+        if not code:
+            raise click.ClickException('Response did not include a daily promo code.')
+
+        click.echo(code)
+
+    @staticmethod
+    def daily_code(payload):
+        success = payload.get('success')
+        if not isinstance(success, dict):
+            return None
+
+        panini_code = success.get('paniniCode')
+        if not isinstance(panini_code, dict):
+            return None
+
+        code = panini_code.get('code')
+        if not isinstance(code, str):
+            return None
+
+        code = code.strip()
+        return code or None
+
+    @staticmethod
+    def format_errors(errors):
+        if isinstance(errors, list):
+            return ', '.join(DailyPlay.format_error(error) for error in errors)
+        return DailyPlay.format_error(errors)
+
+    @staticmethod
+    def format_error(error):
+        if isinstance(error, str):
+            return error
+        return json.dumps(error, separators=(',', ':'))
 
     def send_code(self):
         request = Request(
