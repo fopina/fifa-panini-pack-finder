@@ -11,7 +11,7 @@ pip install fifa-panini
 ## Usage
 
 ```
-$ fifa-panini panini --cookie 'session=value; other=value' try --dry-run --code VD13-V24K-ABCD
+$ fifa-panini panini --cookie 'session=value; other=value' try --dry-run VD13-V24K-ABCD
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-ABCD
 ```
 

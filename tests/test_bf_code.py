@@ -11,6 +11,13 @@ from fifa_panini.commands.bf_code import BfCode
 from fifa_panini.commands.panini import API_ENDPOINT
 from fifa_panini.commands.try_code import DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse
 
+GOOD_TRY_CODE_RESPONSE_TEXT = (
+    '[{"code":"SDB9-LM7T-93YT","is_multi_code":false,"market":"cr","action":"unlock_pack"},'
+    '{"amount":1,"from_entered_code":true,"was_premium_code":false,"total_packs":2,"action":"received_packs"},'
+    '{"has_new_challenge":true,"has_just_completed_challenge":false,"num_available_challenges":1,'
+    '"action":"challenge_summary"}]'
+)
+
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
     return {'cookie': cookie, 'api_endpoint': api_endpoint}
@@ -88,6 +95,8 @@ class BfCodeTestCase(unittest.TestCase):
         self.assertIn('--api-endpoint', group_help.output)
 
         self.assertEqual(try_help.exit_code, 0)
+        self.assertIn('CODE', try_help.output)
+        self.assertNotIn('--code', try_help.output)
         self.assertNotIn('--cookie', try_help.output)
         self.assertNotIn('--api-endpoint', try_help.output)
 
@@ -136,6 +145,8 @@ class BfCodeTestCase(unittest.TestCase):
 
         def fake_send_code(code):
             text = '{"error":"code.already_used"}' if code == command.code_base else '{"ok":true}'
+            if code != command.code_base:
+                text = GOOD_TRY_CODE_RESPONSE_TEXT
             return CodeResponse(text=text, headers={'Content-Type': 'application/json'})
 
         with (
@@ -163,7 +174,7 @@ class BfCodeTestCase(unittest.TestCase):
                 return CodeResponse(text='{"error":"code.already_used"}', headers={'Content-Type': 'application/json'})
             if len(attempts) == 2:
                 return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json', 'X-Pack': 'found'})
+            return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with (
             patch.object(command, 'send_code', fake_send_code),
@@ -211,7 +222,7 @@ class BfCodeTestCase(unittest.TestCase):
                 return CodeResponse(text='{"error":"code.already_used"}', headers={'Content-Type': 'application/json'})
             if len(attempts) == 2:
                 return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+            return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with (
             patch.object(command, 'send_code', fake_send_code),
@@ -238,7 +249,7 @@ class BfCodeTestCase(unittest.TestCase):
                 return CodeResponse(text='{"error":"code.already_used"}', headers={'Content-Type': 'application/json'})
             if len(attempts) == 2:
                 return CodeResponse(text='{"error":"code.invalid"}', headers={'Content-Type': 'application/json'})
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+            return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with (
             patch.object(command, 'send_code', fake_send_code),
@@ -300,12 +311,12 @@ class BfCodeTestCase(unittest.TestCase):
             attempts.append(code)
             if code == self.code_base:
                 return CodeResponse(text='{"error":"code.already_used"}', headers={'Content-Type': 'application/json'})
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+            return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with patch.object(BfCode, 'send_code', fake_send_code):
             result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'bf'])
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(attempts, ['ABCD-EFGH-IJKL', 'ABCD-EFGH-AAAA'])
-        self.assertIn('Response headers:\nContent-Type: application/json\nResponse text:\n{"ok":true}\n', result.output)
+        self.assertIn('Won 1 packs. Total packs: 2\n', result.output)
         self.assertTrue((config.parent / DEFAULT_STATE_FILE).exists())

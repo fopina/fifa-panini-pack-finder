@@ -9,6 +9,12 @@ from fifa_panini.cli import CLI
 from fifa_panini.commands.daily_play import DEFAULT_DAILY_PLAY_ENDPOINT, DailyPlay
 from fifa_panini.commands.try_code import CodeResponse
 
+GOOD_DAILY_PLAY_RESPONSE_TEXT = (
+    '{"success":{"paniniCode":{"code":"2CVJ-81ZE-91MT",'
+    '"usedAt":"2026-07-21T10:49:12+01:00","isNew":false}},"errors":[]}'
+)
+ERROR_DAILY_PLAY_RESPONSE_TEXT = '{"success":{},"errors":["daily.code_unavailable",{"message":"try later"}]}'
+
 
 class DailyPlayTestCase(unittest.TestCase):
     def setUp(self):
@@ -35,7 +41,7 @@ class DailyPlayTestCase(unittest.TestCase):
                 return False
 
             def read(self):
-                return b'{"code":"daily26pack"}'
+                return GOOD_DAILY_PLAY_RESPONSE_TEXT.encode()
 
         def fake_urlopen(request, timeout):
             requests.append((request, timeout))
@@ -56,7 +62,7 @@ class DailyPlayTestCase(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(
             result.output,
-            'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n',
+            '2CVJ-81ZE-91MT\n',
         )
         request, timeout = requests[0]
         self.assertEqual(request.full_url, DEFAULT_DAILY_PLAY_ENDPOINT)
@@ -83,7 +89,7 @@ class DailyPlayTestCase(unittest.TestCase):
         def fake_send_code():
             nonlocal calls
             calls += 1
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+            return CodeResponse(text=GOOD_DAILY_PLAY_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with patch.object(command, 'send_code', fake_send_code):
             command()
@@ -111,7 +117,7 @@ class DailyPlayTestCase(unittest.TestCase):
                 return False
 
             def read(self):
-                return b'{"code":"daily26pack"}'
+                return GOOD_DAILY_PLAY_RESPONSE_TEXT.encode()
 
         def fake_urlopen(request, timeout):
             requests.append((request, timeout))
@@ -123,9 +129,119 @@ class DailyPlayTestCase(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(
             result.output,
-            'Response headers:\nContent-Type: application/json\nResponse text:\n{"code":"daily26pack"}\n',
+            '2CVJ-81ZE-91MT\n',
         )
         self.assertEqual(requests[0][0].get_header('Cookie'), 'session=value')
+
+    def test_prints_only_code_for_success_response(self):
+        config = self.write_config()
+
+        with patch.object(
+            DailyPlay,
+            'send_code',
+            lambda _self: CodeResponse(
+                text=GOOD_DAILY_PLAY_RESPONSE_TEXT, headers={'Content-Type': 'application/json'}
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'daily-play',
+                    '--cookie',
+                    'session=value',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, '2CVJ-81ZE-91MT\n')
+        self.assertNotIn('Response headers:', result.output)
+        self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(GOOD_DAILY_PLAY_RESPONSE_TEXT, result.output)
+
+    def test_raises_click_exception_for_error_response(self):
+        config = self.write_config()
+
+        with patch.object(
+            DailyPlay,
+            'send_code',
+            lambda _self: CodeResponse(
+                text=ERROR_DAILY_PLAY_RESPONSE_TEXT, headers={'Content-Type': 'application/json'}
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'daily-play',
+                    '--cookie',
+                    'session=value',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: Response errors: daily.code_unavailable, {"message":"try later"}\n')
+        self.assertNotIn('Response headers:', result.output)
+        self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(ERROR_DAILY_PLAY_RESPONSE_TEXT, result.output)
+
+    def test_raises_click_exception_when_code_is_missing(self):
+        config = self.write_config()
+
+        for response_text in (
+            '{"success":{"paniniCode":{}},"errors":[]}',
+            '{"success":{"paniniCode":{"code":null}},"errors":[]}',
+            '{"success":{"paniniCode":{"code":""}},"errors":[]}',
+            '{"success":{},"errors":[]}',
+        ):
+            with self.subTest(response_text=response_text):
+                with patch.object(
+                    DailyPlay,
+                    'send_code',
+                    lambda _self, response_text=response_text: CodeResponse(
+                        text=response_text,
+                        headers={'Content-Type': 'application/json'},
+                    ),
+                ):
+                    result = CliRunner().invoke(
+                        CLI.click,
+                        [
+                            '--config',
+                            str(config),
+                            'daily-play',
+                            '--cookie',
+                            'session=value',
+                        ],
+                    )
+
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertEqual(result.output, 'Error: Response did not include a daily promo code.\n')
+                self.assertNotIn('Response headers:', result.output)
+                self.assertNotIn('Response text:', result.output)
+
+    def test_raises_click_exception_when_response_is_not_json(self):
+        config = self.write_config()
+
+        with patch.object(
+            DailyPlay,
+            'send_code',
+            lambda _self: CodeResponse(text='not json', headers={'Content-Type': 'application/json'}),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'daily-play',
+                    '--cookie',
+                    'session=value',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn('Response was not valid JSON', result.output)
 
     def test_requires_cookie(self):
         config = self.write_config()
