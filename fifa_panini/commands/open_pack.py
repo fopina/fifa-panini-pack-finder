@@ -1,3 +1,5 @@
+import datetime as dt
+import json
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
 
@@ -84,8 +86,66 @@ class OpenPack(Panini.Command):
             raise click.ClickException(f'Request failed for open pack: {error}') from error
 
     def print_response(self, response):
-        click.echo('Response headers:')
-        for name, value in response.headers.items():
-            click.echo(f'{name}: {value}')
-        click.echo('Response text:')
-        click.echo(response.text, nl=not response.text.endswith('\n'))
+        try:
+            actions = json.loads(response.text)
+        except json.JSONDecodeError as error:
+            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+
+        if not isinstance(actions, list):
+            raise click.ClickException('Response JSON must be an array of action objects.')
+
+        error_message = self.error_message(actions)
+        if error_message:
+            raise click.ClickException(error_message)
+
+        wait_message = self.wait_message(actions)
+        if wait_message:
+            raise click.ClickException(wait_message)
+
+        open_pack = self.action(actions, 'open_pack')
+        if not open_pack:
+            raise click.ClickException('Response did not include opened pack information.')
+
+        stickers = open_pack.get('stickers') or []
+        click.echo(f'Opened stickers: {", ".join(str(sticker) for sticker in stickers)}')
+
+    @staticmethod
+    def action(actions, name):
+        for action in actions:
+            if isinstance(action, dict) and action.get('action') == name:
+                return action
+        return {}
+
+    @staticmethod
+    def error_message(actions):
+        for action in actions:
+            if not isinstance(action, dict) or 'error' not in action:
+                continue
+
+            error = action['error']
+            if isinstance(error, dict):
+                return error.get('message') or str(error)
+            return str(error)
+        return None
+
+    def wait_message(self, actions):
+        for action in actions:
+            if not isinstance(action, dict) or 'wait' not in action:
+                continue
+
+            wait = action['wait']
+            if not isinstance(wait, dict):
+                return str(wait)
+
+            reason = wait.get('reason') or str(wait)
+            countdown_seconds = wait.get('countdown_seconds')
+            if countdown_seconds is None:
+                return reason
+
+            available_at = self.current_time() + dt.timedelta(seconds=countdown_seconds)
+            return f'{reason} {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'
+        return None
+
+    @staticmethod
+    def current_time():
+        return dt.datetime.now().astimezone()

@@ -1,3 +1,5 @@
+import datetime as dt
+import json
 from urllib.request import Request, urlopen
 
 import classyclick
@@ -79,8 +81,59 @@ class Claim(Panini.Command):
             raise click.ClickException(f'Request failed for claim packs: {error}') from error
 
     def print_response(self, response):
-        click.echo('Response headers:')
-        for name, value in response.headers.items():
-            click.echo(f'{name}: {value}')
-        click.echo('Response text:')
-        click.echo(response.text, nl=not response.text.endswith('\n'))
+        try:
+            actions = json.loads(response.text)
+        except json.JSONDecodeError as error:
+            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+
+        if not isinstance(actions, list):
+            raise click.ClickException('Response JSON must be an array of action objects.')
+
+        next_packs_message = self.next_packs_message(actions)
+        error_message = self.error_message(actions)
+        if error_message:
+            message = error_message
+            if next_packs_message:
+                message = f'{message}. {next_packs_message}'
+            raise click.ClickException(message)
+
+        received_packs = self.action(actions, 'received_packs')
+        if not received_packs:
+            raise click.ClickException('Response did not include received pack information.')
+
+        click.echo(f'Claimed packs: {received_packs.get("amount", 0)}')
+        click.echo(f'Total packs: {received_packs.get("total_packs", 0)}')
+        if next_packs_message:
+            click.echo(next_packs_message)
+
+    def next_packs_message(self, actions):
+        daily_packs_status = self.action(actions, 'daily_packs_status')
+        new_packs_in_sec = daily_packs_status.get('new_packs_in_sec')
+        if new_packs_in_sec is None:
+            return None
+
+        available_at = self.current_time() + dt.timedelta(seconds=new_packs_in_sec)
+        return f'New packs available at: {available_at.strftime("%Y-%m-%d %H:%M:%S %Z").rstrip()}'
+
+    @staticmethod
+    def current_time():
+        return dt.datetime.now().astimezone()
+
+    @staticmethod
+    def action(actions, name):
+        for action in actions:
+            if isinstance(action, dict) and action.get('action') == name:
+                return action
+        return {}
+
+    @staticmethod
+    def error_message(actions):
+        for action in actions:
+            if not isinstance(action, dict) or 'error' not in action:
+                continue
+
+            error = action['error']
+            if isinstance(error, dict):
+                return error.get('message') or str(error)
+            return str(error)
+        return None
