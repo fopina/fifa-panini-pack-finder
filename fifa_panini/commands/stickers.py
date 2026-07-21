@@ -88,20 +88,23 @@ class Stickers(Panini.Command):
             raise click.ClickException('Response did not include init sticker stacks.')
 
         album_stickers = self.sticker_numbers(stacks.get('album') or [])
-        temp_stickers = self.sticker_numbers(stacks.get('temp') or [])
+        new_stickers = self.sticker_numbers(stacks.get('temp') or [])
+        swap_stickers = self.sticker_numbers(stacks.get('swap') or [])
+        non_album_stickers = new_stickers + swap_stickers
         album_sticker_set = set(album_stickers)
 
-        duplicate_stickers = [sticker for sticker in temp_stickers if sticker in album_sticker_set]
-        stickers_to_glue = [sticker for sticker in temp_stickers if sticker not in album_sticker_set]
-        own_sticker_set = album_sticker_set | set(temp_stickers)
+        duplicate_stickers = [sticker for sticker in non_album_stickers if sticker in album_sticker_set]
+        stickers_to_glue = [sticker for sticker in non_album_stickers if sticker not in album_sticker_set]
+        own_sticker_set = album_sticker_set | set(non_album_stickers)
 
         other_album_sticker_set = set(other_album_stickers)
         offer_stickers = [sticker for sticker in duplicate_stickers if sticker not in other_album_sticker_set]
         ask_stickers = [sticker for sticker in other_duplicate_stickers if sticker not in own_sticker_set]
 
         click.echo(f'Owned stickers: {self.format_stickers(album_stickers)}')
-        click.echo(f'DUPLICATE stickers: {self.format_stickers(duplicate_stickers)}')
-        click.echo(f'Stickers to glue: {self.format_stickers(stickers_to_glue)}')
+        click.echo(f'New DUPLICATE stickers: {self.format_stickers(duplicate_stickers)}')
+        click.echo(f'Swap stickers: {self.format_stickers(swap_stickers)}')
+        click.echo(f'New Stickers to glue: {self.format_stickers(stickers_to_glue)}')
         if self.swap_out or self.swap_in:
             click.echo(f'Offer: {self.format_stickers(offer_stickers)}')
             click.echo(f'Ask: {self.format_stickers(ask_stickers)}')
