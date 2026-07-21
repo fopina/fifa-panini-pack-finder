@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -45,14 +46,45 @@ class CodeMethodsMixin:
             )
 
     def print_response(self, response):
-        tqdm.write('Response headers:')
-        for name, value in response.headers.items():
-            tqdm.write(f'{name}: {value}')
-        tqdm.write('Response text:')
-        tqdm.write(response.text, end='' if response.text.endswith('\n') else '\n')
+        try:
+            actions = json.loads(response.text)
+        except json.JSONDecodeError as error:
+            raise click.ClickException(f'Response was not valid JSON: {error}') from error
+
+        if not isinstance(actions, list):
+            raise click.ClickException('Response JSON must be an array of action objects.')
+
+        error_message = self.error_message(actions)
+        if error_message:
+            raise click.ClickException(error_message)
+
+        received_packs = self.action(actions, 'received_packs')
+        if not received_packs:
+            raise click.ClickException('Response did not include received pack information.')
+
+        tqdm.write(f'Won {received_packs.get("amount", 0)} packs. Total packs: {received_packs.get("total_packs", 0)}')
 
     def send_code(self, code):
         return self.panini_client.post_json(UNLOCK_PACK_PATH, {'code': code}, request_name=code)
+
+    @staticmethod
+    def action(actions, name):
+        for action in actions:
+            if isinstance(action, dict) and action.get('action') == name:
+                return action
+        return {}
+
+    @staticmethod
+    def error_message(actions):
+        for action in actions:
+            if not isinstance(action, dict) or 'error' not in action:
+                continue
+
+            error = action['error']
+            if isinstance(error, dict):
+                return error.get('message') or str(error)
+            return str(error)
+        return None
 
     @property
     def state_path(self):
@@ -83,9 +115,7 @@ class TryCode(CodeMethodsMixin, Panini.Command):
 
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
-    code: str = classyclick.Option(
-        help='Promo code in XXXX-XXXX-XXXX format.',
-    )
+    code: str = classyclick.Argument()
     dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
@@ -112,4 +142,4 @@ class TryCode(CodeMethodsMixin, Panini.Command):
                 f'Pass them as options or save them in the config file.'
             )
         validate_cookie_header(self.cookie)
-        self.validate_code(self.code, '--code')
+        self.validate_code(self.code, 'code')

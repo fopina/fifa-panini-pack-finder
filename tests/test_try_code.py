@@ -9,6 +9,18 @@ from fifa_panini.cli import CLI
 from fifa_panini.commands.panini import API_ENDPOINT
 from fifa_panini.commands.try_code import CodeResponse, TryCode
 
+GOOD_TRY_CODE_RESPONSE_TEXT = (
+    '[{"code":"SDB9-LM7T-93YT","is_multi_code":false,"market":"cr","action":"unlock_pack"},'
+    '{"amount":1,"from_entered_code":true,"was_premium_code":false,"total_packs":2,"action":"received_packs"},'
+    '{"has_new_challenge":true,"has_just_completed_challenge":false,"num_available_challenges":1,'
+    '"action":"challenge_summary"}]'
+)
+BAD_TRY_CODE_RESPONSE_TEXT = (
+    '[{"error":{"message":"code.already_used"},"action":"unlock_pack"},'
+    '{"has_new_challenge":true,"has_just_completed_challenge":false,"num_available_challenges":1,'
+    '"action":"challenge_summary"}]'
+)
+
 
 def panini_settings(cookie='session=value', api_endpoint=API_ENDPOINT):
     return {'cookie': cookie, 'api_endpoint': api_endpoint}
@@ -40,7 +52,6 @@ class TryCodeTestCase(unittest.TestCase):
                 'https://example.test/api/',
                 'try',
                 '--dry-run',
-                '--code',
                 'ABCD-EFGH-IJKL',
             ],
         )
@@ -58,12 +69,123 @@ class TryCodeTestCase(unittest.TestCase):
 
         def fake_send_code(code):
             attempts.append(code)
-            return CodeResponse(text='{"ok":true}', headers={'Content-Type': 'application/json'})
+            return CodeResponse(text=GOOD_TRY_CODE_RESPONSE_TEXT, headers={'Content-Type': 'application/json'})
 
         with patch.object(command, 'send_code', fake_send_code):
             command()
 
         self.assertEqual(attempts, ['ABCD-EFGH-IJKL'])
+
+    def test_prints_pack_summary_for_success_response(self):
+        config = self.write_config()
+
+        with patch.object(
+            TryCode,
+            'send_code',
+            lambda _self, _code: CodeResponse(
+                text=GOOD_TRY_CODE_RESPONSE_TEXT,
+                headers={'Content-Type': 'application/json'},
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'try',
+                    'ABCD-EFGH-IJKL',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Won 1 packs. Total packs: 2\n')
+        self.assertNotIn('Response headers:', result.output)
+        self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(GOOD_TRY_CODE_RESPONSE_TEXT, result.output)
+
+    def test_raises_click_exception_for_error_response(self):
+        config = self.write_config()
+
+        with patch.object(
+            TryCode,
+            'send_code',
+            lambda _self, _code: CodeResponse(
+                text=BAD_TRY_CODE_RESPONSE_TEXT,
+                headers={'Content-Type': 'application/json'},
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'try',
+                    'ABCD-EFGH-IJKL',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: code.already_used\n')
+        self.assertNotIn('Response headers:', result.output)
+        self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(BAD_TRY_CODE_RESPONSE_TEXT, result.output)
+
+    def test_raises_click_exception_when_received_packs_are_missing(self):
+        config = self.write_config()
+
+        with patch.object(
+            TryCode,
+            'send_code',
+            lambda _self, _code: CodeResponse(
+                text='[{"code":"SDB9-LM7T-93YT","action":"unlock_pack"}]',
+                headers={'Content-Type': 'application/json'},
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'try',
+                    'ABCD-EFGH-IJKL',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: Response did not include received pack information.\n')
+
+    def test_raises_click_exception_when_response_is_not_json(self):
+        config = self.write_config()
+
+        with patch.object(
+            TryCode,
+            'send_code',
+            lambda _self, _code: CodeResponse(text='not json', headers={'Content-Type': 'application/json'}),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'try',
+                    'ABCD-EFGH-IJKL',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn('Response was not valid JSON', result.output)
 
     def test_send_code_posts_unlock_pack_payload(self):
         captured = {}
@@ -109,7 +231,6 @@ class TryCodeTestCase(unittest.TestCase):
                 'session=abc\u2026',
                 'try',
                 '--dry-run',
-                '--code',
                 'ABCD-EFGH-IJKL',
             ],
         )
@@ -124,13 +245,13 @@ class TryCodeTestCase(unittest.TestCase):
                     '[panini]',
                     'cookie = "session=value"',
                     'api_endpoint = "https://example.test/api/"',
-                    '[panini.try]',
-                    'code = "ABCD-EFGH-IJKL"',
                 ]
             )
         )
 
-        result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'try', '--dry-run'])
+        result = CliRunner().invoke(
+            CLI.click, ['--config', str(config), 'panini', 'try', '--dry-run', 'ABCD-EFGH-IJKL']
+        )
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.output, 'DRY RUN POST https://example.test/api/unlock_pack.json code=ABCD-EFGH-IJKL\n')
