@@ -50,7 +50,7 @@ class TryCodeTestCase(unittest.TestCase):
                 'session=value',
                 '--api-endpoint',
                 'https://example.test/api/',
-                'try',
+                'try-code',
                 '--dry-run',
                 'ABCD-EFGH-IJKL',
             ],
@@ -95,7 +95,7 @@ class TryCodeTestCase(unittest.TestCase):
                     'panini',
                     '--cookie',
                     'session=value',
-                    'try',
+                    'try-code',
                     'ABCD-EFGH-IJKL',
                 ],
             )
@@ -125,7 +125,7 @@ class TryCodeTestCase(unittest.TestCase):
                     'panini',
                     '--cookie',
                     'session=value',
-                    'try',
+                    'try-code',
                     'ABCD-EFGH-IJKL',
                 ],
             )
@@ -155,7 +155,7 @@ class TryCodeTestCase(unittest.TestCase):
                     'panini',
                     '--cookie',
                     'session=value',
-                    'try',
+                    'try-code',
                     'ABCD-EFGH-IJKL',
                 ],
             )
@@ -179,7 +179,7 @@ class TryCodeTestCase(unittest.TestCase):
                     'panini',
                     '--cookie',
                     'session=value',
-                    'try',
+                    'try-code',
                     'ABCD-EFGH-IJKL',
                 ],
             )
@@ -229,7 +229,7 @@ class TryCodeTestCase(unittest.TestCase):
                 'panini',
                 '--cookie',
                 'session=abc\u2026',
-                'try',
+                'try-code',
                 '--dry-run',
                 'ABCD-EFGH-IJKL',
             ],
@@ -250,7 +250,7 @@ class TryCodeTestCase(unittest.TestCase):
         )
 
         result = CliRunner().invoke(
-            CLI.click, ['--config', str(config), 'panini', 'try', '--dry-run', 'ABCD-EFGH-IJKL']
+            CLI.click, ['--config', str(config), 'panini', 'try-code', '--dry-run', 'ABCD-EFGH-IJKL']
         )
 
         self.assertEqual(result.exit_code, 0)

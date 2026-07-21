@@ -15,7 +15,7 @@ class ConfigTestCase(unittest.TestCase):
 
     def test_config_command_masks_cookie(self):
         config = self.tmp_path / 'config.toml'
-        config.write_text('[panini]\ncookie = "session=value"\n[panini.bf]\ncode_base = "ABCD-EFGH-IJKL"\n')
+        config.write_text('[panini]\ncookie = "session=value"\n[panini.bf-code]\ncode_base = "ABCD-EFGH-IJKL"\n')
 
         result = CliRunner().invoke(CLI.click, ['--config', str(config), 'config'])
 

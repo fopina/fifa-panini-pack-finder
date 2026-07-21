@@ -11,14 +11,14 @@ pip install fifa-panini
 ## Usage
 
 ```
-$ fifa-panini panini --cookie 'session=value; other=value' try --dry-run VD13-V24K-ABCD
+$ fifa-panini panini --cookie 'session=value; other=value' try-code --dry-run VD13-V24K-ABCD
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-ABCD
 ```
 
 Brute-force the final block from a known-used code base:
 
 ```
-$ fifa-panini panini --cookie 'session=value; other=value' bf --dry-run --code-base VD13-V24K-0000
+$ fifa-panini panini --cookie 'session=value; other=value' bf-code --dry-run --code-base VD13-V24K-0000
 DRY RUN POST https://paninicollection.fifa.com/api/unlock_pack.json code=VD13-V24K-AAAA
 ```
 
@@ -38,7 +38,7 @@ Persist settings in the classyclick config file:
 
 ```
 $ fifa-panini config -e
-$ fifa-panini panini bf --dry-run
+$ fifa-panini panini bf-code --dry-run
 ```
 
 ```python

@@ -3,11 +3,11 @@
 cookie = "_panstwc_session=....; _abck=...."
 # api_endpoint = "https://paninicollection.fifa.com/api/"
 
-[panini.try]
+[panini.try-code]
 code = ""
 # request_timeout = 30.0
 
-[panini.bf]
+[panini.bf-code]
 code_base = ""
 # state_file = ".fifa-panini-try-code-state.json"
 # request_timeout = 30.0

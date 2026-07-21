@@ -111,12 +111,10 @@ class CodeMethodsMixin:
 class TryCode(CodeMethodsMixin, Panini.Command):
     """Try one FIFA Panini promo code."""
 
-    __config__ = classyclick.Command.Config(name='try')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     code: str = classyclick.Argument()
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
         default=DEFAULT_REQUEST_TIMEOUT,

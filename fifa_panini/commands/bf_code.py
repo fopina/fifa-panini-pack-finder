@@ -22,8 +22,6 @@ from .try_code import (
 class BfCode(CodeMethodsMixin, Panini.Command):
     """Brute-force FIFA Panini promo codes by iterating the final block."""
 
-    __config__ = classyclick.Command.Config(name='bf')
-
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     code_base: str = classyclick.Option(
@@ -35,7 +33,7 @@ class BfCode(CodeMethodsMixin, Panini.Command):
         show_default=True,
         help='Path used to save resume state.',
     )
-    dry_run: bool = classyclick.Option(default=False, help='Print the request that would be attempted.')
+    dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
     request_timeout: float = classyclick.Option(
         '--timeout',
         default=30.0,
