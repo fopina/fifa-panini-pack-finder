@@ -50,7 +50,6 @@ class CodeMethodsMixin:
             )
 
     def print_response(self, response):
-        print(response.text)
         actions = parse_action_list(response)
 
         unlock_pack = self.action(actions, 'unlock_pack')
