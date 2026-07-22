@@ -52,13 +52,16 @@ class CodeMethodsMixin:
     def print_response(self, response):
         actions = parse_action_list(response)
 
+        unlock_pack = self.action(actions, 'unlock_pack')
+        if not unlock_pack:
+            raise click.ClickException('Response did not include unlock pack information.')
+        message = self.error_message(unlock_pack)
+        if message:
+            raise click.ClickException(message)
+
         received_packs = self.action(actions, 'received_packs')
         if not received_packs:
             raise click.ClickException('Response did not include received pack information.')
-
-        message = self.error_message(received_packs)
-        if message:
-            raise click.ClickException(message)
 
         tqdm.write(f'Won {received_packs.get("amount", 0)} packs. Total packs: {received_packs.get("total_packs", 0)}')
 

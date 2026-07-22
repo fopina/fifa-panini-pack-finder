@@ -13,6 +13,7 @@ GOOD_DAILY_PLAY_RESPONSE_TEXT = (
     '{"success":{"paniniCode":{"code":"2CVJ-81ZE-91MT",'
     '"usedAt":"2026-07-21T10:49:12+01:00","isNew":false}},"errors":[]}'
 )
+PENDING_DAILY_PLAY_RESPONSE_TEXT = '{"success":{"paniniCode":{"code":null}},"errors":[]}'
 ERROR_DAILY_PLAY_RESPONSE_TEXT = '{"success":{},"errors":["daily.code_unavailable",{"message":"try later"}]}'
 
 
@@ -95,6 +96,86 @@ class DailyPlayTestCase(unittest.TestCase):
             command()
 
         self.assertEqual(calls, 1)
+
+    def test_generates_code_with_bodyless_post_when_get_returns_null_code(self):
+        config = self.write_config()
+        requests = []
+        response_texts = [
+            PENDING_DAILY_PLAY_RESPONSE_TEXT,
+            GOOD_DAILY_PLAY_RESPONSE_TEXT,
+        ]
+
+        class FakeResponse:
+            headers = {'Content-Type': 'application/json'}
+
+            def __init__(self, text):
+                self.text = text
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _exc_type, _exc_value, _traceback):
+                return False
+
+            def read(self):
+                return self.text.encode()
+
+        def fake_urlopen(request, timeout):
+            requests.append((request, timeout))
+            return FakeResponse(response_texts[len(requests) - 1])
+
+        with patch('fifa_panini.commands.daily_play.urlopen', fake_urlopen):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'daily-play',
+                    '--cookie',
+                    'session=value',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, '2CVJ-81ZE-91MT\n')
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[0][0].get_method(), 'GET')
+        self.assertEqual(requests[1][0].get_method(), 'POST')
+        self.assertIsNone(requests[1][0].data)
+        self.assertEqual(requests[1][0].full_url, DEFAULT_DAILY_PLAY_ENDPOINT)
+        self.assertEqual(requests[1][0].get_header('Cookie'), 'session=value')
+        self.assertEqual(requests[1][1], 30.0)
+
+    def test_handles_post_generation_response_the_same_way(self):
+        config = self.write_config()
+        responses = [
+            CodeResponse(text=PENDING_DAILY_PLAY_RESPONSE_TEXT, headers={'Content-Type': 'application/json'}),
+            CodeResponse(
+                text='{"success":{"paniniCode":{"code":null}},"errors":[]}',
+                headers={'Content-Type': 'application/json'},
+            ),
+        ]
+        methods = []
+
+        def fake_send_code(_self, method='GET'):
+            methods.append(method)
+            return responses[len(methods) - 1]
+
+        with patch.object(DailyPlay, 'send_code', fake_send_code):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'daily-play',
+                    '--cookie',
+                    'session=value',
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.output, 'Error: Response did not include a daily promo code.\n')
+        self.assertEqual(methods, ['GET', 'POST'])
 
     def test_loads_settings_from_config(self):
         config = self.write_config(
@@ -192,7 +273,6 @@ class DailyPlayTestCase(unittest.TestCase):
 
         for response_text in (
             '{"success":{"paniniCode":{}},"errors":[]}',
-            '{"success":{"paniniCode":{"code":null}},"errors":[]}',
             '{"success":{"paniniCode":{"code":""}},"errors":[]}',
             '{"success":{},"errors":[]}',
         ):
