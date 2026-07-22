@@ -102,9 +102,10 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, f'{GOOD_TRY_CODE_RESPONSE_TEXT}\nWon 1 packs. Total packs: 2\n')
+        self.assertEqual(result.output, 'Won 1 packs. Total packs: 2\n')
         self.assertNotIn('Response headers:', result.output)
         self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(GOOD_TRY_CODE_RESPONSE_TEXT, result.output)
 
     def test_ignores_error_from_unrelated_action(self):
         config = self.write_config()
@@ -136,7 +137,8 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, f'{response_text}\nWon 1 packs. Total packs: 2\n')
+        self.assertEqual(result.output, 'Won 1 packs. Total packs: 2\n')
+        self.assertNotIn(response_text, result.output)
 
     def test_raises_click_exception_for_error_response(self):
         config = self.write_config()
@@ -163,9 +165,10 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(result.output, f'Error: code.already_used\n{BAD_TRY_CODE_RESPONSE_TEXT}\n')
+        self.assertEqual(result.output, 'Error: code.already_used\n')
         self.assertNotIn('Response headers:', result.output)
         self.assertNotIn('Response text:', result.output)
+        self.assertNotIn(BAD_TRY_CODE_RESPONSE_TEXT, result.output)
 
     def test_raises_click_exception_when_received_packs_are_missing(self):
         config = self.write_config()
@@ -193,9 +196,8 @@ class TryCodeTestCase(unittest.TestCase):
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(
-            result.output, f'Error: Response did not include received pack information.\n{response_text}\n'
-        )
+        self.assertEqual(result.output, 'Error: Response did not include received pack information.\n')
+        self.assertNotIn(response_text, result.output)
 
     def test_raises_click_exception_when_response_is_not_json(self):
         config = self.write_config()
