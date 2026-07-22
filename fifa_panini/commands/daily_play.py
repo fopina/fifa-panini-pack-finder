@@ -25,7 +25,12 @@ class DailyPlay(CLI.Command):
         self.validate_settings()
 
         response = self.send_code()
-        self.print_response(response)
+        payload = self.response_payload(response)
+        if self.code_generation_is_pending(payload):
+            response = self.send_code(method='POST')
+            payload = self.response_payload(response)
+
+        self.print_payload(payload)
 
     def validate_settings(self):
         if not self.cookie:
@@ -35,6 +40,10 @@ class DailyPlay(CLI.Command):
         validate_cookie_header(self.cookie)
 
     def print_response(self, response):
+        self.print_payload(self.response_payload(response))
+
+    @staticmethod
+    def response_payload(response):
         try:
             payload = json.loads(response.text)
         except json.JSONDecodeError as error:
@@ -43,6 +52,9 @@ class DailyPlay(CLI.Command):
         if not isinstance(payload, dict):
             raise click.ClickException('Response JSON must be an object.')
 
+        return payload
+
+    def print_payload(self, payload):
         errors = payload.get('errors')
         if errors:
             raise click.ClickException(f'Response errors: {self.format_errors(errors)}')
@@ -52,6 +64,18 @@ class DailyPlay(CLI.Command):
             raise click.ClickException('Response did not include a daily promo code.')
 
         click.echo(code)
+
+    @staticmethod
+    def code_generation_is_pending(payload):
+        success = payload.get('success')
+        if not isinstance(success, dict):
+            return False
+
+        panini_code = success.get('paniniCode')
+        if not isinstance(panini_code, dict):
+            return False
+
+        return 'code' in panini_code and panini_code.get('code') is None
 
     @staticmethod
     def daily_code(payload):
@@ -82,7 +106,7 @@ class DailyPlay(CLI.Command):
             return error
         return json.dumps(error, separators=(',', ':'))
 
-    def send_code(self):
+    def send_code(self, method='GET'):
         request = Request(
             DEFAULT_DAILY_PLAY_ENDPOINT,
             headers={
@@ -91,7 +115,7 @@ class DailyPlay(CLI.Command):
                 'Accept': '*/*',
                 'Accept-Language': 'en-GB,en;q=0.9',
             },
-            method='GET',
+            method=method,
         )
 
         try:
