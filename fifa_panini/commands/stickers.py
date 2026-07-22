@@ -100,27 +100,33 @@ class Stickers(Panini.Command):
 
         stacks = init_stacks(response)
         album_stickers = sticker_numbers(stacks.get('album') or [])
-        new_stickers = sticker_numbers(stacks.get('temp') or [])
+        temp_stickers = sticker_numbers(stacks.get('temp') or [])
         swap_stickers = sticker_numbers(stacks.get('swap') or [])
-        non_album_stickers = new_stickers + swap_stickers
+        loose_stickers = temp_stickers + swap_stickers
         album_sticker_set = set(album_stickers)
 
-        duplicate_stickers = [sticker for sticker in non_album_stickers if sticker in album_sticker_set]
-        stickers_to_glue = [sticker for sticker in non_album_stickers if sticker not in album_sticker_set]
-        own_sticker_set = album_sticker_set | set(non_album_stickers)
+        duplicate_stickers = [sticker for sticker in temp_stickers if sticker in album_sticker_set]
+        swap_duplicate_stickers = [sticker for sticker in swap_stickers if sticker in album_sticker_set]
+        new_stickers = [sticker for sticker in temp_stickers if sticker not in album_sticker_set]
+        swap_non_duplicate_stickers = [sticker for sticker in swap_stickers if sticker not in album_sticker_set]
+        own_sticker_set = album_sticker_set | set(loose_stickers)
 
         other_album_sticker_set = set(other_album_stickers)
+        duplicate_offer_stickers = duplicate_stickers + swap_duplicate_stickers
         offer_stickers = [
             sticker
-            for sticker in (duplicate_stickers if not self.swap_new else non_album_stickers)
+            for sticker in (duplicate_offer_stickers if not self.swap_new else loose_stickers)
             if sticker not in other_album_sticker_set
         ]
         ask_stickers = [sticker for sticker in other_duplicate_stickers if sticker not in own_sticker_set]
 
         click.echo(f'Owned stickers: {format_stickers(album_stickers)}')
-        click.echo(f'New DUPLICATE stickers: {format_stickers(duplicate_stickers)}')
+        if duplicate_stickers:
+            click.echo(f'New DUPLICATE stickers: {format_stickers(duplicate_stickers)}')
         click.echo(f'Swap stickers: {format_stickers(swap_stickers)}')
-        click.echo(f'New Stickers to glue: {format_stickers(stickers_to_glue)}')
+        click.echo(f'New stickers: {format_stickers(new_stickers)}')
+        if swap_non_duplicate_stickers:
+            click.echo(f'Non-duplicate stickers in swap: {format_stickers(swap_non_duplicate_stickers)}')
         if self.swap_out or self.swap_in:
             click.echo(f'Offer: {format_stickers(offer_stickers)}')
             click.echo(f'Ask: {format_stickers(ask_stickers)}')

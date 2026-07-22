@@ -26,15 +26,21 @@ class StickersTestCase(unittest.TestCase):
         config.write_text(content)
         return config
 
-    def stickers_response_text(self):
+    def stickers_response_text(self, temp_stickers=None, swap_stickers=None):
+        if temp_stickers is None:
+            temp_stickers = [17, 44, 114, 2]
+        stacks = {
+            'album': [[1, 0], [2, 0], [44, 3], [98, 1]],
+            'temp': temp_stickers,
+        }
+        if swap_stickers is not None:
+            stacks['swap'] = swap_stickers
+
         return json.dumps(
             [
                 {'millis': 60000, 'action': 'poll_interval'},
                 {
-                    'stacks': {
-                        'album': [[1, 0], [2, 0], [44, 3], [98, 1]],
-                        'temp': [17, 44, 114, 2],
-                    },
+                    'stacks': stacks,
                     'action': 'init',
                 },
             ]
@@ -216,7 +222,7 @@ class StickersTestCase(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertEqual(result.output, 'Error: Response did not include move_stickers confirmation.\n')
 
-    def test_prints_owned_duplicates_and_stickers_to_glue(self):
+    def test_prints_owned_duplicates_and_new_stickers(self):
         config = self.write_config()
 
         with patch(
@@ -243,7 +249,77 @@ class StickersTestCase(unittest.TestCase):
                     'Owned stickers: 1, 2, 44, 98',
                     'New DUPLICATE stickers: 44, 2',
                     'Swap stickers: (none)',
-                    'New Stickers to glue: 17, 114',
+                    'New stickers: 17, 114',
+                    '',
+                ]
+            ),
+        )
+
+    def test_prints_temp_only_duplicates_and_swap_non_duplicates(self):
+        config = self.write_config()
+
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(
+                text=self.stickers_response_text(swap_stickers=[98, 107, 114])
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'stickers',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            '\n'.join(
+                [
+                    'Owned stickers: 1, 2, 44, 98',
+                    'New DUPLICATE stickers: 44, 2',
+                    'Swap stickers: 98, 107, 114',
+                    'New stickers: 17, 114',
+                    'Non-duplicate stickers in swap: 107, 114',
+                    '',
+                ]
+            ),
+        )
+
+    def test_hides_empty_temp_duplicates_and_swap_non_duplicates(self):
+        config = self.write_config()
+
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json',
+            lambda _self, *_args, **_kwargs: StickersResponse(
+                text=self.stickers_response_text(temp_stickers=[17, 114], swap_stickers=[98])
+            ),
+        ):
+            result = CliRunner().invoke(
+                CLI.click,
+                [
+                    '--config',
+                    str(config),
+                    'panini',
+                    '--cookie',
+                    'session=value',
+                    'stickers',
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            result.output,
+            '\n'.join(
+                [
+                    'Owned stickers: 1, 2, 44, 98',
+                    'Swap stickers: 98',
+                    'New stickers: 17, 114',
                     '',
                 ]
             ),
@@ -280,7 +356,7 @@ class StickersTestCase(unittest.TestCase):
                     'Owned stickers: 1, 2, 44, 98',
                     'New DUPLICATE stickers: 44, 2',
                     'Swap stickers: (none)',
-                    'New Stickers to glue: 17, 114',
+                    'New stickers: 17, 114',
                     'Offer: 44',
                     'Ask: 200, 201',
                     '',
