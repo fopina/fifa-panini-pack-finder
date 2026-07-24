@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.stickers import INFO_PATH, Stickers, StickersResponse
+from fifa_panini.commands.panini.stickers import INFO_PATH, Stickers, StickersResponse
 from fifa_panini.utils.panini import API_ENDPOINT
 
 

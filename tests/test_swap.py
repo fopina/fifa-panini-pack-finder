@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.swap import (
+from fifa_panini.commands.panini.swap import (
     DELETE_SWAP_REQUEST_PATH,
     INFO_PATH,
     SWAP_REQUESTS_PATH,

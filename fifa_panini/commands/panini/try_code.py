@@ -2,7 +2,7 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from ..utils.codes import (
+from ...utils.codes import (
     CODE_ALREADY_USED_MARKER,
     CODE_BASE_PATTERN,
     CODE_PATTERN,
@@ -15,11 +15,11 @@ from ..utils.codes import (
     CodeMethodsMixin,
     CodeResponse,
 )
-from ..utils.panini import (
+from ...utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
     validate_cookie_header,
 )
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
+from . import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 __all__ = [
     'CODE_ALREADY_USED_MARKER',

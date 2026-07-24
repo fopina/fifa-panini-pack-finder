@@ -1,14 +1,14 @@
 import classyclick
 import click
 
-from ..utils.actions import action, parse_action_list
-from ..utils.panini import (
+from ...utils.actions import action, parse_action_list
+from ...utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
     PaniniClient,
     PaniniResponse,
     validate_cookie_header,
 )
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
+from . import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 INFO_PATH = 'init.json'
 InfoResponse = PaniniResponse
