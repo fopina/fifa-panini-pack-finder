@@ -1,7 +1,11 @@
 import classyclick
 
 from ..cli import CLI
-from ..utils.panini import API_ENDPOINT, PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY
+from ..utils.panini import (
+    API_ENDPOINT,
+    PANINI_API_ENDPOINT_META_KEY,
+    PANINI_COOKIE_META_KEY,
+)
 
 __all__ = [
     'API_ENDPOINT',

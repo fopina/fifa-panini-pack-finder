@@ -10,8 +10,8 @@ from ..utils.panini import (
 )
 from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
-InfoResponse = PaniniResponse
 INFO_PATH = 'init.json'
+InfoResponse = PaniniResponse
 
 
 class Info(Panini.Command):
