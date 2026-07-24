@@ -73,8 +73,7 @@ class MoveTestCase(unittest.TestCase):
                 [
                     'DRY RUN POST https://example.test/api/move_stickers.json '
                     'json={"from":"temp","to":{"swap":[44,114]}}',
-                    'DRY RUN POST https://example.test/api/move_stickers.json '
-                    'json={"from":"album","to":{"swap":[1]}}',
+                    'DRY RUN POST https://example.test/api/move_stickers.json json={"from":"album","to":{"swap":[1]}}',
                     'Already in swap: 98',
                     '',
                 ]
@@ -164,7 +163,9 @@ class MoveTestCase(unittest.TestCase):
             MoveResponse(text='[{"error":{"message":"move_stickers.temp_to_swap"},"action":"move_stickers"}]'),
         ]
 
-        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: responses.pop(0)):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: responses.pop(0)
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
@@ -189,7 +190,9 @@ class MoveTestCase(unittest.TestCase):
             MoveResponse(text='[]'),
         ]
 
-        with patch('fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: responses.pop(0)):
+        with patch(
+            'fifa_panini.utils.panini.PaniniClient.post_json', lambda _self, *_args, **_kwargs: responses.pop(0)
+        ):
             result = CliRunner().invoke(
                 CLI.click,
                 [
