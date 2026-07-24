@@ -1,14 +1,13 @@
 import classyclick
 import click
 
-from ..utils.actions import action, format_error, parse_action_list
+from ..utils.actions import action
 from ..utils.panini import DEFAULT_REQUEST_TIMEOUT, PaniniClient, PaniniResponse, validate_cookie_header
 from ..utils.stickers import format_stickers, init_stacks, parse_sticker_list, sticker_number, sticker_numbers
 from .info import INFO_PATH
 from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 StickersResponse = PaniniResponse
-MOVE_STICKERS_PATH = 'move_stickers.json'
 
 
 class Stickers(Panini.Command):
@@ -17,10 +16,6 @@ class Stickers(Panini.Command):
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
-    move: str = classyclick.Option(
-        '--move',
-        help='Sticker numbers to move from temp to swap, comma separated.',
-    )
     swap_out: str = classyclick.Option(
         '--swap-out',
         help='Sticker numbers in the other player album, comma separated.',
@@ -46,23 +41,6 @@ class Stickers(Panini.Command):
     def __call__(self):
         self.validate_settings()
 
-        if self.move:
-            stickers_to_move = self.parse_sticker_list(self.move, '--move')
-            payload = {'from': 'temp', 'to': {'swap': stickers_to_move}}
-            if self.dry_run:
-                json_payload = PaniniClient.form_data(payload)['json']
-                click.echo(f'DRY RUN POST {self.panini_client.endpoint(MOVE_STICKERS_PATH)} json={json_payload}')
-                return
-
-            response = self.panini_client.post_json(
-                MOVE_STICKERS_PATH,
-                payload=payload,
-                request_name='move stickers',
-            )
-            self.validate_move_response(response)
-            click.echo(f'Moved stickers to swap: {format_stickers(stickers_to_move)}')
-            return
-
         if self.dry_run:
             click.echo(f'DRY RUN POST {self.panini_client.endpoint(INFO_PATH)} json={{}}')
             return
@@ -76,23 +54,6 @@ class Stickers(Panini.Command):
                 'Missing required setting(s): cookie. Pass them as options or save them in the config file.'
             )
         validate_cookie_header(self.cookie)
-
-    @classmethod
-    def validate_move_response(cls, response):
-        actions = parse_action_list(
-            response,
-            response_name='Move stickers response',
-            array_message='Move stickers response JSON must be an array.',
-        )
-
-        move_action = action(actions, 'move_stickers')
-        if not move_action:
-            raise click.ClickException('Response did not include move_stickers confirmation.')
-
-        if 'error' in move_action:
-            raise click.ClickException(cls.error_message(move_action['error']))
-
-    error_message = staticmethod(format_error)
 
     def print_response(self, response):
         other_album_stickers = self.parse_sticker_list(self.swap_out, '--swap-out')
