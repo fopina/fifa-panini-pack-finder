@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.open_pack import OPEN_PACK_PATH, OpenPack, PackResponse
+from fifa_panini.commands.panini.open_pack import OPEN_PACK_PATH, OpenPack, PackResponse
 from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_OPEN_PACK_RESPONSE_TEXT = (
@@ -208,7 +208,7 @@ class OpenPackTestCase(unittest.TestCase):
                     headers={'Content-Type': 'application/json'},
                 ),
             ),
-            patch('fifa_panini.commands.open_pack.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.open_pack.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,

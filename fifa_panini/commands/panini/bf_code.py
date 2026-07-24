@@ -6,7 +6,7 @@ import classyclick
 import click
 from tqdm import tqdm
 
-from ..utils.codes import (
+from ...utils.codes import (
     CODE_ALREADY_USED_MARKER,
     DEFAULT_REQUEST_DELAY,
     DEFAULT_STATE_FILE,
@@ -15,11 +15,11 @@ from ..utils.codes import (
     TOTAL_SUFFIXES,
     CodeMethodsMixin,
 )
-from ..utils.panini import (
+from ...utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
     validate_cookie_header,
 )
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
+from . import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 
 class BfCode(CodeMethodsMixin, Panini.Command):

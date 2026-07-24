@@ -7,8 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.info import INFO_PATH
-from fifa_panini.commands.move import MOVE_STICKERS_PATH, Move, MoveResponse
+from fifa_panini.commands.panini.info import INFO_PATH
+from fifa_panini.commands.panini.move import MOVE_STICKERS_PATH, Move, MoveResponse
 from fifa_panini.utils.panini import API_ENDPOINT
 
 

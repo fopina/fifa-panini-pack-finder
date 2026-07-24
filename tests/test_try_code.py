@@ -6,7 +6,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.try_code import TryCode
+from fifa_panini.commands.panini.try_code import TryCode
 from fifa_panini.utils.codes import CodeResponse
 from fifa_panini.utils.panini import API_ENDPOINT
 

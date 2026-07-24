@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.claim import CLAIM_PACKS_PATH, Claim
+from fifa_panini.commands.panini.claim import CLAIM_PACKS_PATH, Claim
 from fifa_panini.utils.panini import API_ENDPOINT
 
 GOOD_CLAIM_RESPONSE_TEXT = (
@@ -69,7 +69,7 @@ class ClaimTestCase(unittest.TestCase):
 
         with (
             patch('fifa_panini.utils.panini.requests.Session.post', fake_post),
-            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -133,7 +133,7 @@ class ClaimTestCase(unittest.TestCase):
 
         with (
             patch('fifa_panini.utils.panini.requests.Session.post', fake_post),
-            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(CLI.click, ['--config', str(config), 'panini', 'claim'])
 
@@ -148,7 +148,7 @@ class ClaimTestCase(unittest.TestCase):
                 'fifa_panini.utils.panini.PaniniClient.post_json',
                 lambda _self, *_args, **_kwargs: ClaimResponseStub(GOOD_CLAIM_RESPONSE_TEXT),
             ),
-            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -185,7 +185,7 @@ class ClaimTestCase(unittest.TestCase):
                 'fifa_panini.utils.panini.PaniniClient.post_json',
                 lambda _self, *_args, **_kwargs: ClaimResponseStub(response_text),
             ),
-            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,
@@ -213,7 +213,7 @@ class ClaimTestCase(unittest.TestCase):
                 'fifa_panini.utils.panini.PaniniClient.post_json',
                 lambda _self, *_args, **_kwargs: ClaimResponseStub(BAD_CLAIM_RESPONSE_TEXT),
             ),
-            patch('fifa_panini.commands.claim.dt.datetime', FixedDateTime),
+            patch('fifa_panini.commands.panini.claim.dt.datetime', FixedDateTime),
         ):
             result = CliRunner().invoke(
                 CLI.click,

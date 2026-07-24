@@ -7,7 +7,7 @@ import click
 from click.testing import CliRunner
 
 from fifa_panini.cli import CLI
-from fifa_panini.commands.bf_code import BfCode
+from fifa_panini.commands.panini.bf_code import BfCode
 from fifa_panini.utils.codes import DEFAULT_STATE_FILE, TOTAL_SUFFIXES, CodeResponse
 from fifa_panini.utils.panini import API_ENDPOINT
 
@@ -150,7 +150,7 @@ class BfCodeTestCase(unittest.TestCase):
             return CodeResponse(text=text, headers={'Content-Type': 'application/json'})
 
         with (
-            patch('fifa_panini.commands.bf_code.tqdm', FakeProgress),
+            patch('fifa_panini.commands.panini.bf_code.tqdm', FakeProgress),
             patch.object(command, 'send_code', fake_send_code),
         ):
             command()
@@ -178,7 +178,7 @@ class BfCodeTestCase(unittest.TestCase):
 
         with (
             patch.object(command, 'send_code', fake_send_code),
-            patch('fifa_panini.commands.bf_code.time.sleep', lambda _seconds: None),
+            patch('fifa_panini.commands.panini.bf_code.time.sleep', lambda _seconds: None),
         ):
             command()
 
@@ -226,7 +226,7 @@ class BfCodeTestCase(unittest.TestCase):
 
         with (
             patch.object(command, 'send_code', fake_send_code),
-            patch('fifa_panini.commands.bf_code.time.sleep', sleeps.append),
+            patch('fifa_panini.commands.panini.bf_code.time.sleep', sleeps.append),
         ):
             command()
 
@@ -253,7 +253,7 @@ class BfCodeTestCase(unittest.TestCase):
 
         with (
             patch.object(command, 'send_code', fake_send_code),
-            patch('fifa_panini.commands.bf_code.time.sleep', sleeps.append),
+            patch('fifa_panini.commands.panini.bf_code.time.sleep', sleeps.append),
         ):
             command()
 

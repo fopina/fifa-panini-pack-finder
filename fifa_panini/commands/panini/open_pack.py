@@ -3,14 +3,14 @@ import datetime as dt
 import classyclick
 import click
 
-from ..utils.actions import action, action_with_status, error_message, parse_action_list
-from ..utils.panini import (
+from ...utils.actions import action, action_with_status, error_message, parse_action_list
+from ...utils.panini import (
     DEFAULT_REQUEST_TIMEOUT,
     PaniniClient,
     PaniniResponse,
     validate_cookie_header,
 )
-from .panini import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
+from . import PANINI_API_ENDPOINT_META_KEY, PANINI_COOKIE_META_KEY, Panini
 
 OPEN_PACK_PATH = 'open_pack.json'
 
