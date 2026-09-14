@@ -88,6 +88,44 @@ class SwapTestCase(unittest.TestCase):
             ]
         )
 
+    def test_collect_posts_each_received_swap_and_stops_on_error(self):
+        config = self.write_config()
+        stack_actions = json.loads(self.swap_response_text())
+        stack_actions[1]['received_swaps'] = [
+            {'id': swap_id, 'received': [121, 127], 'given': [81, 86]}
+            for swap_id in ['4399585804394855846', '2562693308756677408', 'third']
+        ]
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json') as post:
+            post.side_effect = [
+                SwapResponse(text=json.dumps(stack_actions)),
+                SwapResponse(text=self.swap_requests_response_text([])),
+                SwapResponse(text='[{"action":"execute_received_swap"}]'),
+                SwapResponse(text='[{"action":"execute_received_swap","error":{"message":"failed"}}]'),
+            ]
+            result = CliRunner().invoke(
+                CLI.click,
+                ['--config', str(config), 'panini', '--cookie', 'session=value', 'swap', '--collect'],
+            )
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(post.call_count, 4)
+        for call, swap_id in zip(post.call_args_list[2:], ['4399585804394855846', '2562693308756677408']):
+            self.assertEqual(call.args, ('execute_received_swap.json',))
+            self.assertEqual(call.kwargs['payload'], {'id': swap_id})
+        self.assertIn('Collected swap: 4399585804394855846\n', result.output)
+        self.assertNotIn('Collected swap: 2562693308756677408', result.output)
+        self.assertTrue(result.output.endswith('Error: failed\n'))
+
+    def test_collect_dry_run_does_not_send_requests(self):
+        config = self.write_config()
+        with patch('fifa_panini.utils.panini.PaniniClient.post_json') as post:
+            result = CliRunner().invoke(
+                CLI.click,
+                ['--config', str(config), 'panini', '--cookie', 'session=value', 'swap', '--collect', '--dry-run'],
+            )
+        self.assertEqual(result.exit_code, 0)
+        post.assert_not_called()
+        self.assertIn('execute_received_swap.json', result.output)
+
     def test_cli_exposes_command(self):
         config = self.write_config()
 
@@ -362,15 +400,19 @@ class SwapTestCase(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'Swap stickers: 3, 5\nSwap requests: (none)\n')
+        self.assertEqual(result.output, 'Swap stickers: 3, 5\nSwap requests: (none)\nSwaps executed: (none)\n')
 
     def test_prints_swap_requests(self):
         config = self.write_config()
+        stack_actions = json.loads(self.swap_response_text())
+        stack_actions[1]['received_swaps'] = [
+            {'id': '2562693308756677408', 'received': [121, 127], 'given': [81, 86]},
+        ]
 
         with patch(
             'fifa_panini.utils.panini.PaniniClient.post_json',
             post_json_responses(
-                SwapResponse(text=self.swap_response_text()),
+                SwapResponse(text=json.dumps(stack_actions)),
                 SwapResponse(text=self.swap_requests_response_text()),
             ),
         ):
@@ -397,6 +439,8 @@ class SwapTestCase(unittest.TestCase):
                         '- id: 1784658490062; offer: stickers: 492, 672, 737, full stack; '
                         'demand: stickers: 107, 108, 109; only team'
                     ),
+                    'Swaps executed:',
+                    '- id: 2562693308756677408; +121, +127; -81, -86',
                     '',
                 ]
             ),
@@ -440,6 +484,7 @@ class SwapTestCase(unittest.TestCase):
                     'Swap stickers: 3, 5',
                     'Swap requests:',
                     '- id: 1784658490063; offer: stickers: 492, groups: BRA; demand: groups: POR, ARG',
+                    'Swaps executed: (none)',
                     '',
                 ]
             ),
@@ -468,7 +513,7 @@ class SwapTestCase(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, 'Swap stickers: (none)\nSwap requests: (none)\n')
+        self.assertEqual(result.output, 'Swap stickers: (none)\nSwap requests: (none)\nSwaps executed: (none)\n')
 
     def test_raises_click_exception_when_init_action_is_missing(self):
         config = self.write_config()
