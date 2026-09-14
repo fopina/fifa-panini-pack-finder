@@ -13,6 +13,7 @@ SwapResponse = PaniniResponse
 SWAP_REQUESTS_PATH = 'swap_requests.json'
 DELETE_SWAP_REQUEST_PATH = 'delete_swap_request.json'
 UPDATE_SWAP_REQUEST_PATH = 'update_swap_request.json'
+EXECUTE_RECEIVED_SWAP_PATH = 'execute_received_swap.json'
 
 
 class Swap(Panini.Command):
@@ -21,6 +22,7 @@ class Swap(Panini.Command):
     cookie: str = classyclick.ContextMeta(PANINI_COOKIE_META_KEY)
     api_endpoint: str = classyclick.ContextMeta(PANINI_API_ENDPOINT_META_KEY)
     dry_run: bool = classyclick.Option(help='Print the request that would be attempted.')
+    collect: bool = classyclick.Option('--collect', help='Collect all received swaps.')
     delete: str = classyclick.Option(
         '--delete',
         help='Swap request ID to delete.',
@@ -97,11 +99,36 @@ class Swap(Panini.Command):
         if self.dry_run:
             click.echo(f'DRY RUN POST {self.panini_client.endpoint(INFO_PATH)} json={{}}')
             click.echo(f'DRY RUN POST {self.panini_client.endpoint(SWAP_REQUESTS_PATH)} json={{}}')
+            if self.collect:
+                click.echo(
+                    f'DRY RUN POST {self.panini_client.endpoint(EXECUTE_RECEIVED_SWAP_PATH)} '
+                    'json={"id":"<received swap ID>"} (for each received swap from init)'
+                )
             return
 
         swap_stack_response = self.panini_client.post_json(INFO_PATH, request_name='swap')
         swap_requests_response = self.panini_client.post_json(SWAP_REQUESTS_PATH, request_name='swap requests')
         self.print_response(swap_stack_response, swap_requests_response)
+        if self.collect:
+            self.collect_swaps(swap_stack_response)
+
+    def collect_swaps(self, response):
+        swaps = self.received_swaps(response)
+        if not swaps:
+            click.echo('No swaps to collect.')
+            return
+
+        for swap in swaps:
+            result = self.panini_client.post_json(
+                EXECUTE_RECEIVED_SWAP_PATH,
+                payload={'id': swap['id']},
+                request_name=f'collect swap {swap["id"]}',
+            )
+            actions = parse_action_list(result, response_name='Collect swap response')
+            for action_item in actions:
+                if isinstance(action_item, dict) and 'error' in action_item:
+                    raise click.ClickException(self.error_message(action_item['error']))
+            click.echo(f'Collected swap: {swap["id"]}')
 
     def validate_settings(self):
         if not self.cookie:
@@ -111,6 +138,8 @@ class Swap(Panini.Command):
         validate_cookie_header(self.cookie)
 
     def validate_operation(self):
+        if self.collect and (self.delete or self.create):
+            raise click.ClickException('--collect cannot be used with --delete or --create.')
         if self.delete and self.create:
             raise click.ClickException('--delete and --create cannot be used together.')
         if self.create_allow_duplicates and not self.create:
@@ -151,6 +180,35 @@ class Swap(Panini.Command):
         swap_stickers = sticker_numbers(stacks.get('swap') or [])
         click.echo(f'Swap stickers: {format_stickers(swap_stickers)}')
         self.print_swap_requests(swap_requests_response)
+        self.print_executed_swaps(swap_stack_response)
+
+    @classmethod
+    def received_swaps(cls, response):
+        actions = parse_action_list(response)
+        swaps = cls.action(actions, 'init').get('received_swaps') or []
+        if not isinstance(swaps, list):
+            raise click.ClickException('Init action must include a received_swaps array.')
+        for swap in swaps:
+            if not isinstance(swap, dict):
+                raise click.ClickException('Executed swap must be an object.')
+            if not swap.get('id'):
+                raise click.ClickException('Executed swap must include an id.')
+        return swaps
+
+    @classmethod
+    def print_executed_swaps(cls, response):
+        swaps = cls.received_swaps(response)
+        if not swaps:
+            click.echo('Swaps executed: (none)')
+            return
+
+        click.echo('Swaps executed:')
+        for swap in swaps:
+            if not isinstance(swap, dict):
+                raise click.ClickException('Executed swap must be an object.')
+            received = format_stickers([f'+{sticker}' for sticker in sticker_numbers(swap['received'])])
+            given = format_stickers([f'-{sticker}' for sticker in sticker_numbers(swap['given'])])
+            click.echo(f'- id: {swap["id"]}; {received}; {given}')
 
     @classmethod
     def print_swap_requests(cls, response):
